@@ -12,12 +12,14 @@ export default function Caja() {
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   const [error, setError] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     const load = async () => {
       try { const [cash, currentOrders] = await Promise.all([getCashSession(), getOrders()]); setSession(cash); setOrders(currentOrders); }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar la caja.'); }
+      finally { setLoading(false); }
     };
     void load();
     void subscribeRestaurantData(load).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: Error) => setError(reason.message));
@@ -55,7 +57,11 @@ export default function Caja() {
         <div className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${session?.status === 'abierta' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}><span className={`h-2.5 w-2.5 rounded-full ${session?.status === 'abierta' ? 'bg-emerald-500' : 'bg-slate-400'}`} />Caja {session?.status ?? 'cerrada'}</div>
       </div>
 
-      {(!session || session.status === 'cerrada') ? (
+      {loading ? (
+        <div className="grid min-h-72 place-items-center rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="text-center"><div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" /><p className="mt-4 text-sm font-semibold text-slate-500">Consultando caja abierta…</p></div>
+        </div>
+      ) : (!session || session.status === 'cerrada') ? (
         <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-blue-100 text-blue-600"><LockKeyhole /></div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Abrir caja</h2><p className="mt-2 text-sm text-slate-500">Registra el efectivo con el que empiezas el turno.</p>
