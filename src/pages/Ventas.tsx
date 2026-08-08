@@ -85,7 +85,7 @@ export default function Ventas() {
         {loading && <p className="py-10 text-center text-sm text-slate-400">Cargando productos...</p>}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product) => (
-            <button key={product.id} onClick={() => addProduct(product.id)} className="min-h-36 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
+            <button key={product.id} onClick={() => addProduct(product.id)} className="min-h-36 touch-manipulation rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg active:scale-[0.98] active:border-blue-600 active:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:active:bg-slate-800">
               <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-800">{product.category}</span>
               <p className="mt-4 font-bold text-slate-900 dark:text-white">{product.name}</p>
               <div className="mt-3 flex items-end justify-between"><strong className="text-lg text-blue-600">{money.format(product.price)}</strong><span className="text-xs text-slate-400">Stock {product.stock}</span></div>
@@ -112,7 +112,7 @@ export default function Ventas() {
         <div className="border-t border-slate-200 p-5 dark:border-slate-800">
           {notice && <p className={`mb-3 rounded-lg p-3 text-xs font-semibold ${notice.includes('correctamente') ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{notice}</p>}
           <div className="mb-4 flex items-end justify-between"><span className="text-sm font-semibold text-slate-500">Total</span><strong className="text-3xl text-slate-900 dark:text-white">{money.format(total)}</strong></div>
-          <button disabled={sending} onClick={sendOrder} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : 'Enviar a cocina'}</button>
+          <button disabled={sending} onClick={sendOrder} className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : 'Enviar a cocina'}</button>
         </div>
       </aside>
     </div>

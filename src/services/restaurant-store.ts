@@ -3,6 +3,8 @@ import type { CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantPr
 
 type BusinessContext = { empresaId: string; sucursalId: string };
 let cachedContext: BusinessContext | null = null;
+let cachedCash: CashSession | null | undefined;
+let cachedProducts: RestaurantProduct[] | null = null;
 
 async function context(): Promise<BusinessContext> {
   if (cachedContext) return cachedContext;
@@ -19,10 +21,12 @@ export async function getBusinessContext() {
 }
 
 export async function getProducts(): Promise<RestaurantProduct[]> {
+  if (cachedProducts) return cachedProducts;
   const { empresaId } = await context();
   const { data, error } = await supabase.from('rest_productos').select('id,nombre,categoria,precio,stock,activo').eq('empresa_id', empresaId).eq('activo', true).order('categoria').order('nombre');
   if (error) throw error;
-  return (data ?? []).map((row) => ({ id: row.id, name: row.nombre, category: row.categoria, price: Number(row.precio), stock: Number(row.stock), active: row.activo }));
+  cachedProducts = (data ?? []).map((row) => ({ id: row.id, name: row.nombre, category: row.categoria, price: Number(row.precio), stock: Number(row.stock), active: row.activo }));
+  return cachedProducts;
 }
 
 type OrderRow = {
@@ -57,8 +61,17 @@ export async function createOrder(order: { serviceType: ServiceType; table?: str
   });
   if (error) throw error;
   const created = Array.isArray(data) ? data[0] : data;
-  const orders = await getOrders();
-  return orders.find((item) => item.id === created.id) ?? orders[0];
+  return {
+    id: created.id,
+    number: Number(created.numero),
+    serviceType: order.serviceType,
+    table: order.table,
+    customer: order.customer,
+    status: created.estado as OrderStatus,
+    items: order.items,
+    createdAt: created.created_at,
+    updatedAt: created.updated_at,
+  } satisfies RestaurantOrder;
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: string) {
@@ -68,11 +81,13 @@ export async function updateOrderStatus(id: string, status: OrderStatus, payment
   if (error) throw error;
 }
 
-export async function getCashSession(): Promise<CashSession | null> {
+export async function getCashSession(force = false): Promise<CashSession | null> {
+  if (!force && cachedCash !== undefined) return cachedCash;
   const { empresaId, sucursalId } = await context();
   const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,estado,abierta_at,cerrada_at').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
   if (error) throw error;
-  return data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined } : null;
+  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined } : null;
+  return cachedCash;
 }
 
 export async function openCash(openingAmount: number) {
@@ -81,7 +96,8 @@ export async function openCash(openingAmount: number) {
   if (userError || !userData.user) throw userError ?? new Error('Sesión requerida.');
   const { error } = await supabase.from('rest_cajas').insert({ empresa_id: empresaId, sucursal_id: sucursalId, abierta_por: userData.user.id, monto_apertura: openingAmount });
   if (error) throw error;
-  return getCashSession();
+  cachedCash = undefined;
+  return getCashSession(true);
 }
 
 export async function closeCash(closingAmount: number) {
@@ -90,11 +106,12 @@ export async function closeCash(closingAmount: number) {
   if (!cash || userError || !userData.user) throw userError ?? new Error('No existe una caja abierta.');
   const { error } = await supabase.from('rest_cajas').update({ estado: 'cerrada', monto_cierre: closingAmount, cerrada_por: userData.user.id, cerrada_at: new Date().toISOString() }).eq('id', cash.id);
   if (error) throw error;
+  cachedCash = null;
 }
 
 export async function subscribeRestaurantData(listener: () => void) {
   const { empresaId } = await context();
-  const channel = supabase.channel(`rest-operacion-${empresaId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, listener).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, listener).subscribe();
+  const channel = supabase.channel(`rest-operacion-${empresaId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, listener).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, () => { cachedCash = undefined; listener(); }).subscribe();
   return () => { void supabase.removeChannel(channel); };
 }
 
