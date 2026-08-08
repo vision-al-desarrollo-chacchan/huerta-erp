@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
+import type { CashMovement, CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 
 type BusinessContext = { empresaId: string; sucursalId: string };
 let cachedContext: BusinessContext | null = null;
@@ -113,9 +113,24 @@ export async function closeCash(closingAmount: number, notes?: string) {
   cachedCash = null;
 }
 
+export async function getCashMovements(): Promise<CashMovement[]> {
+  const cash = await getCashSession();
+  if (!cash) return [];
+  const { data, error } = await supabase.from('rest_movimientos_caja').select('id,tipo,concepto,monto,metodo_pago,registrado_por_nombre,created_at').eq('caja_id', cash.id).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ id: row.id, type: row.tipo, concept: row.concepto, amount: Number(row.monto), paymentMethod: row.metodo_pago, registeredByName: row.registrado_por_nombre, createdAt: row.created_at }));
+}
+
+export async function registerCashMovement(input: { type: 'ingreso' | 'egreso'; concept: string; amount: number; paymentMethod?: string }) {
+  const cash = await getCashSession();
+  if (!cash) throw new Error('Primero debes abrir la caja.');
+  const { error } = await supabase.rpc('rest_registrar_movimiento_caja', { p_caja_id: cash.id, p_tipo: input.type, p_concepto: input.concept, p_monto: input.amount, p_metodo_pago: input.paymentMethod ?? 'Efectivo' });
+  if (error) throw error;
+}
+
 export async function subscribeRestaurantData(listener: () => void) {
   const { empresaId } = await context();
-  const channel = supabase.channel(`rest-operacion-${empresaId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, listener).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, () => { cachedCash = undefined; listener(); }).subscribe();
+  const channel = supabase.channel(`rest-operacion-${empresaId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, listener).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, () => { cachedCash = undefined; listener(); }).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_movimientos_caja', filter: `empresa_id=eq.${empresaId}` }, listener).subscribe();
   return () => { void supabase.removeChannel(channel); };
 }
 
