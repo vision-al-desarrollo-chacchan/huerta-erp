@@ -40,4 +40,7 @@ export interface CashSession {
   status: 'abierta' | 'cerrada';
   openedByName?: string;
   closedByName?: string;
+  expectedAmount?: number;
+  difference?: number;
+  notes?: string;
 }
