@@ -38,4 +38,6 @@ export interface CashSession {
   openingAmount: number;
   closingAmount?: number;
   status: 'abierta' | 'cerrada';
+  openedByName?: string;
+  closedByName?: string;
 }
