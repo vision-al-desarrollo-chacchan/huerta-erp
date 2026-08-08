@@ -1,109 +1,101 @@
-import type { CashSession, OrderStatus, RestaurantOrder, RestaurantProduct } from '../types/restaurant';
+import { supabase } from '../lib/supabase';
+import type { CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 
-const PRODUCTS_KEY = 'huerta_restaurant_products_v1';
-const ORDERS_KEY = 'huerta_restaurant_orders_v1';
-const CASH_KEY = 'huerta_restaurant_cash_v1';
-const EVENT_NAME = 'huerta:restaurant-data';
+type BusinessContext = { empresaId: string; sucursalId: string };
+let cachedContext: BusinessContext | null = null;
 
-const seedProducts: RestaurantProduct[] = [
-  { id: 'pollo-entero', name: 'Pollo a la brasa entero', category: 'Pollos', price: 68, stock: 30, active: true },
-  { id: 'medio-pollo', name: '1/2 pollo a la brasa', category: 'Pollos', price: 38, stock: 30, active: true },
-  { id: 'cuarto-pollo', name: '1/4 pollo a la brasa', category: 'Pollos', price: 20, stock: 50, active: true },
-  { id: 'parrilla-personal', name: 'Parrilla personal', category: 'Parrillas', price: 32, stock: 25, active: true },
-  { id: 'mostrito', name: 'Mostrito', category: 'Combos', price: 22, stock: 40, active: true },
-  { id: 'chaufa', name: 'Arroz chaufa', category: 'Platos', price: 18, stock: 35, active: true },
-  { id: 'gaseosa-litro', name: 'Gaseosa 1 litro', category: 'Bebidas', price: 10, stock: 24, active: true },
-  { id: 'chicha-jarra', name: 'Jarra de chicha morada', category: 'Bebidas', price: 12, stock: 20, active: true },
-];
-
-function read<T>(key: string, fallback: T): T {
-  try {
-    const value = localStorage.getItem(key);
-    return value ? (JSON.parse(value) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+async function context(): Promise<BusinessContext> {
+  if (cachedContext) return cachedContext;
+  const { data, error } = await supabase.rpc('rest_crear_empresa_inicial', { nombre_empresa: 'Chicken Huerta' });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.empresa_id || !row?.sucursal_id) throw new Error('No se pudo cargar la empresa y sucursal.');
+  cachedContext = { empresaId: row.empresa_id, sucursalId: row.sucursal_id };
+  return cachedContext;
 }
 
-function write<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+export async function getBusinessContext() {
+  return context();
 }
 
-export function subscribeRestaurantData(listener: () => void) {
-  window.addEventListener(EVENT_NAME, listener);
-  window.addEventListener('storage', listener);
-  return () => {
-    window.removeEventListener(EVENT_NAME, listener);
-    window.removeEventListener('storage', listener);
+export async function getProducts(): Promise<RestaurantProduct[]> {
+  const { empresaId } = await context();
+  const { data, error } = await supabase.from('rest_productos').select('id,nombre,categoria,precio,stock,activo').eq('empresa_id', empresaId).eq('activo', true).order('categoria').order('nombre');
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ id: row.id, name: row.nombre, category: row.categoria, price: Number(row.precio), stock: Number(row.stock), active: row.activo }));
+}
+
+type OrderRow = {
+  id: string; numero: number; tipo_servicio: ServiceType; mesa: string | null; cliente: string | null;
+  estado: OrderStatus; metodo_pago: string | null; created_at: string; updated_at: string;
+  rest_pedido_items: { producto_id: string | null; nombre: string; cantidad: number; precio_unitario: number; notas: string | null }[];
+};
+
+function mapOrder(row: OrderRow): RestaurantOrder {
+  return {
+    id: row.id, number: Number(row.numero), serviceType: row.tipo_servicio, table: row.mesa ?? undefined,
+    customer: row.cliente ?? undefined, status: row.estado, paymentMethod: row.metodo_pago ?? undefined,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+    items: (row.rest_pedido_items ?? []).map((item) => ({ productId: item.producto_id ?? '', name: item.nombre, quantity: Number(item.cantidad), unitPrice: Number(item.precio_unitario), notes: item.notas ?? undefined })),
   };
 }
 
-export function getProducts() {
-  const products = read<RestaurantProduct[]>(PRODUCTS_KEY, []);
-  if (products.length) return products;
-  write(PRODUCTS_KEY, seedProducts);
-  return seedProducts;
+export async function getOrders(): Promise<RestaurantOrder[]> {
+  const { empresaId, sucursalId } = await context();
+  const { data, error } = await supabase.from('rest_pedidos').select('id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas)').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).order('created_at', { ascending: false }).limit(250);
+  if (error) throw error;
+  return ((data ?? []) as OrderRow[]).map(mapOrder);
 }
 
-export function saveProducts(products: RestaurantProduct[]) {
-  write(PRODUCTS_KEY, products);
+export async function createOrder(order: { serviceType: ServiceType; table?: string; customer?: string; items: OrderItem[] }) {
+  const { empresaId, sucursalId } = await context();
+  const cash = await getCashSession();
+  if (!cash || cash.status !== 'abierta') throw new Error('Primero debes abrir la caja.');
+  const { data, error } = await supabase.rpc('rest_crear_pedido', {
+    p_empresa_id: empresaId, p_sucursal_id: sucursalId, p_caja_id: cash.id,
+    p_tipo_servicio: order.serviceType, p_mesa: order.table ?? '', p_cliente: order.customer ?? '', p_items: order.items,
+  });
+  if (error) throw error;
+  const created = Array.isArray(data) ? data[0] : data;
+  const orders = await getOrders();
+  return orders.find((item) => item.id === created.id) ?? orders[0];
 }
 
-export function getOrders() {
-  return read<RestaurantOrder[]>(ORDERS_KEY, []);
+export async function updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: string) {
+  const patch: { estado: OrderStatus; updated_at: string; metodo_pago?: string } = { estado: status, updated_at: new Date().toISOString() };
+  if (paymentMethod) patch.metodo_pago = paymentMethod;
+  const { error } = await supabase.from('rest_pedidos').update(patch).eq('id', id);
+  if (error) throw error;
 }
 
-export function createOrder(order: Omit<RestaurantOrder, 'id' | 'number' | 'createdAt' | 'updatedAt' | 'status'>) {
-  const orders = getOrders();
-  const now = new Date().toISOString();
-  const next: RestaurantOrder = {
-    ...order,
-    id: crypto.randomUUID(),
-    number: orders.reduce((max, item) => Math.max(max, item.number), 0) + 1,
-    status: 'nuevo',
-    createdAt: now,
-    updatedAt: now,
-  };
-  write(ORDERS_KEY, [next, ...orders]);
-  return next;
+export async function getCashSession(): Promise<CashSession | null> {
+  const { empresaId, sucursalId } = await context();
+  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,estado,abierta_at,cerrada_at').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
+  if (error) throw error;
+  return data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined } : null;
 }
 
-export function updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: string) {
-  const orders = getOrders().map((order) =>
-    order.id === id
-      ? { ...order, status, paymentMethod: paymentMethod ?? order.paymentMethod, updatedAt: new Date().toISOString() }
-      : order,
-  );
-  write(ORDERS_KEY, orders);
+export async function openCash(openingAmount: number) {
+  const { empresaId, sucursalId } = await context();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw userError ?? new Error('Sesión requerida.');
+  const { error } = await supabase.from('rest_cajas').insert({ empresa_id: empresaId, sucursal_id: sucursalId, abierta_por: userData.user.id, monto_apertura: openingAmount });
+  if (error) throw error;
+  return getCashSession();
 }
 
-export function getCashSession() {
-  return read<CashSession | null>(CASH_KEY, null);
+export async function closeCash(closingAmount: number) {
+  const cash = await getCashSession();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (!cash || userError || !userData.user) throw userError ?? new Error('No existe una caja abierta.');
+  const { error } = await supabase.from('rest_cajas').update({ estado: 'cerrada', monto_cierre: closingAmount, cerrada_por: userData.user.id, cerrada_at: new Date().toISOString() }).eq('id', cash.id);
+  if (error) throw error;
 }
 
-export function openCash(openingAmount: number) {
-  const session: CashSession = {
-    id: crypto.randomUUID(),
-    openingAmount,
-    openedAt: new Date().toISOString(),
-    status: 'abierta',
-  };
-  write(CASH_KEY, session);
-  return session;
-}
-
-export function closeCash(closingAmount: number) {
-  const current = getCashSession();
-  if (!current) return null;
-  const session: CashSession = {
-    ...current,
-    closingAmount,
-    closedAt: new Date().toISOString(),
-    status: 'cerrada',
-  };
-  write(CASH_KEY, session);
-  return session;
+export async function subscribeRestaurantData(listener: () => void) {
+  const { empresaId } = await context();
+  const channel = supabase.channel(`rest-operacion-${empresaId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, listener).on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, listener).subscribe();
+  return () => { void supabase.removeChannel(channel); };
 }
 
 export function orderTotal(order: RestaurantOrder) {

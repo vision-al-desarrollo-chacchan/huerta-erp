@@ -1,18 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
 import { createOrder, getCashSession, getProducts } from '../services/restaurant-store';
-import type { OrderItem, ServiceType } from '../types/restaurant';
+import type { OrderItem, RestaurantProduct, ServiceType } from '../types/restaurant';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
 export default function Ventas() {
-  const [products] = useState(getProducts);
+  const [products, setProducts] = useState<RestaurantProduct[]>([]);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Todas');
   const [serviceType, setServiceType] = useState<ServiceType>('salon');
   const [table, setTable] = useState('Mesa 1');
   const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getProducts().then(setProducts).catch((error: Error) => setNotice(error.message)).finally(() => setLoading(false));
+  }, []);
 
   const categories = ['Todas', ...Array.from(new Set(products.map((item) => item.category)))];
   const filtered = products.filter((product) => {
@@ -38,9 +43,10 @@ export default function Ventas() {
       .filter((item) => item.quantity > 0));
   }
 
-  function sendOrder() {
+  async function sendOrder() {
     setNotice('');
-    if (!getCashSession() || getCashSession()?.status !== 'abierta') {
+    const cash = await getCashSession().catch(() => null);
+    if (!cash || cash.status !== 'abierta') {
       setNotice('Primero debes abrir la caja para registrar pedidos.');
       return;
     }
@@ -48,9 +54,13 @@ export default function Ventas() {
       setNotice('Agrega al menos un producto.');
       return;
     }
-    const order = createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
-    setCart([]);
-    setNotice(`Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`);
+    try {
+      const order = await createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
+      setCart([]);
+      setNotice(`Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'No se pudo registrar el pedido.');
+    }
   }
 
   return (
@@ -65,6 +75,7 @@ export default function Ventas() {
             {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${category === item ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item}</button>)}
           </div>
         </div>
+        {loading && <p className="py-10 text-center text-sm text-slate-400">Cargando productos...</p>}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product) => (
             <button key={product.id} onClick={() => addProduct(product.id)} className="min-h-36 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
