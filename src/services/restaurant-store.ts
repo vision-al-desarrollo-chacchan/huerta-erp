@@ -20,6 +20,13 @@ export async function getBusinessContext() {
   return context();
 }
 
+export async function getCurrentStaffName() {
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user) return 'Usuario';
+  return user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario';
+}
+
 export async function getProducts(): Promise<RestaurantProduct[]> {
   if (cachedProducts) return cachedProducts;
   const { empresaId } = await context();
@@ -84,17 +91,15 @@ export async function updateOrderStatus(id: string, status: OrderStatus, payment
 export async function getCashSession(force = false): Promise<CashSession | null> {
   if (!force && cachedCash !== undefined) return cachedCash;
   const { empresaId, sucursalId } = await context();
-  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,estado,abierta_at,cerrada_at').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
+  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,estado,abierta_at,cerrada_at,abierta_por_nombre,cerrada_por_nombre').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
   if (error) throw error;
-  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined } : null;
+  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined, openedByName: data.abierta_por_nombre ?? undefined, closedByName: data.cerrada_por_nombre ?? undefined } : null;
   return cachedCash;
 }
 
 export async function openCash(openingAmount: number) {
   const { empresaId, sucursalId } = await context();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw userError ?? new Error('Sesión requerida.');
-  const { error } = await supabase.from('rest_cajas').insert({ empresa_id: empresaId, sucursal_id: sucursalId, abierta_por: userData.user.id, monto_apertura: openingAmount });
+  const { error } = await supabase.rpc('rest_abrir_caja', { p_empresa_id: empresaId, p_sucursal_id: sucursalId, p_monto_apertura: openingAmount });
   if (error) throw error;
   cachedCash = undefined;
   return getCashSession(true);
@@ -102,9 +107,8 @@ export async function openCash(openingAmount: number) {
 
 export async function closeCash(closingAmount: number) {
   const cash = await getCashSession();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (!cash || userError || !userData.user) throw userError ?? new Error('No existe una caja abierta.');
-  const { error } = await supabase.from('rest_cajas').update({ estado: 'cerrada', monto_cierre: closingAmount, cerrada_por: userData.user.id, cerrada_at: new Date().toISOString() }).eq('id', cash.id);
+  if (!cash) throw new Error('No existe una caja abierta.');
+  const { error } = await supabase.rpc('rest_cerrar_caja', { p_caja_id: cash.id, p_monto_cierre: closingAmount });
   if (error) throw error;
   cachedCash = null;
 }
