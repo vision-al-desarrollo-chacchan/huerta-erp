@@ -91,9 +91,9 @@ export async function updateOrderStatus(id: string, status: OrderStatus, payment
 export async function getCashSession(force = false): Promise<CashSession | null> {
   if (!force && cachedCash !== undefined) return cachedCash;
   const { empresaId, sucursalId } = await context();
-  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,estado,abierta_at,cerrada_at,abierta_por_nombre,cerrada_por_nombre').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
+  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,monto_esperado,diferencia,observaciones,estado,abierta_at,cerrada_at,abierta_por_nombre,cerrada_por_nombre').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
   if (error) throw error;
-  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined, openedByName: data.abierta_por_nombre ?? undefined, closedByName: data.cerrada_por_nombre ?? undefined } : null;
+  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), expectedAmount: data.monto_esperado == null ? undefined : Number(data.monto_esperado), difference: data.diferencia == null ? undefined : Number(data.diferencia), notes: data.observaciones ?? undefined, status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined, openedByName: data.abierta_por_nombre ?? undefined, closedByName: data.cerrada_por_nombre ?? undefined } : null;
   return cachedCash;
 }
 
@@ -105,10 +105,10 @@ export async function openCash(openingAmount: number) {
   return getCashSession(true);
 }
 
-export async function closeCash(closingAmount: number) {
+export async function closeCash(closingAmount: number, notes?: string) {
   const cash = await getCashSession();
   if (!cash) throw new Error('No existe una caja abierta.');
-  const { error } = await supabase.rpc('rest_cerrar_caja', { p_caja_id: cash.id, p_monto_cierre: closingAmount });
+  const { error } = await supabase.rpc('rest_cerrar_caja_con_arqueo', { p_caja_id: cash.id, p_monto_contado: closingAmount, p_observaciones: notes ?? null });
   if (error) throw error;
   cachedCash = null;
 }

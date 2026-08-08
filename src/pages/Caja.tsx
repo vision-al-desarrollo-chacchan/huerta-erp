@@ -9,6 +9,8 @@ export default function Caja() {
   const [session, setSession] = useState<CashSession | null>(null);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [amount, setAmount] = useState('100');
+  const [countedAmount, setCountedAmount] = useState('');
+  const [closingNotes, setClosingNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   const [error, setError] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -30,6 +32,8 @@ export default function Caja() {
   const paid = orders.filter((order) => order.status === 'pagado');
   const salesTotal = paid.reduce((sum, order) => sum + orderTotal(order), 0);
   const expectedCash = (session?.openingAmount ?? 0) + paid.filter((order) => order.paymentMethod === 'Efectivo').reduce((sum, order) => sum + orderTotal(order), 0);
+  const displayedCountedAmount = countedAmount === '' ? expectedCash.toFixed(2) : countedAmount;
+  const closingDifference = Number(displayedCountedAmount) - expectedCash;
 
   async function refresh() {
     const [cash, currentOrders] = await Promise.all([getCashSession(), getOrders()]);
@@ -82,7 +86,14 @@ export default function Caja() {
               <h2 className="mb-4 font-bold text-slate-900 dark:text-white">Pedidos pendientes de cobro</h2>
               <div className="space-y-3">{delivered.map((order) => <div key={order.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center"><div><strong className="dark:text-white">Pedido #{String(order.number).padStart(3, '0')}</strong><p className="text-sm capitalize text-slate-500">{order.table ?? order.serviceType} · {order.items.length} productos</p></div><div className="flex items-center gap-2"><strong className="mr-2 text-lg dark:text-white">{money.format(orderTotal(order))}</strong><select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"><option>Efectivo</option><option>Yape/Plin</option><option>Tarjeta</option><option>Transferencia</option></select><button disabled={busyAction === order.id} onClick={() => { void collect(order); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{busyAction === order.id ? 'Cobrando…' : 'Cobrar'}</button></div></div>)}{!delivered.length && <p className="rounded-xl border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400 dark:border-slate-700">No hay pedidos pendientes.</p>}</div>
             </section>
-            <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="font-bold text-slate-900 dark:text-white">Cerrar turno</h2><p className="mt-2 text-sm text-slate-500">Cuenta el efectivo físico antes de cerrar.</p><p className="mt-3 rounded-lg bg-slate-100 p-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Responsable del cierre: {staffName}</p><label className="mt-5 block text-xs font-bold uppercase text-slate-500">Efectivo contado</label><input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /><button disabled={busyAction === 'close'} onClick={() => { if (confirm('¿Cerrar la caja actual?')) { setBusyAction('close'); void closeCash(Number(amount)).then(refresh).catch((reason: Error) => setError(reason.message)).finally(() => setBusyAction(null)); } }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button></aside>
+            <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+              <h2 className="font-bold text-slate-900 dark:text-white">Arqueo y cierre</h2><p className="mt-2 text-sm text-slate-500">Cuenta únicamente el efectivo físico de la caja.</p>
+              <p className="mt-3 rounded-lg bg-slate-100 p-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Responsable del cierre: {staffName}</p>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-center"><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] font-bold uppercase text-slate-400">Esperado</p><strong className="text-sm dark:text-white">{money.format(expectedCash)}</strong></div><div className={`rounded-lg p-3 ${Math.abs(closingDifference) < 0.01 ? 'bg-emerald-50 text-emerald-700' : closingDifference > 0 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'}`}><p className="text-[10px] font-bold uppercase">{Math.abs(closingDifference) < 0.01 ? 'Cuadrado' : closingDifference > 0 ? 'Sobrante' : 'Faltante'}</p><strong className="text-sm">{money.format(Math.abs(closingDifference))}</strong></div></div>
+              <label className="mt-5 block text-xs font-bold uppercase text-slate-500">Efectivo contado</label><input type="number" min="0" step="0.01" value={displayedCountedAmount} onChange={(event) => setCountedAmount(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+              {Math.abs(closingDifference) >= 0.01 && <><label className="mt-4 block text-xs font-bold uppercase text-amber-600">Explicación obligatoria</label><textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Indica el motivo del sobrante o faltante..." className="mt-2 min-h-20 w-full rounded-xl border border-amber-300 p-3 text-sm dark:bg-slate-950 dark:text-white" /></>}
+              <button disabled={busyAction === 'close' || (Math.abs(closingDifference) >= 0.01 && !closingNotes.trim())} onClick={() => { if (confirm('¿Cerrar la caja actual?')) { setBusyAction('close'); void closeCash(Number(displayedCountedAmount), closingNotes).then(refresh).catch((reason: Error) => setError(reason.message)).finally(() => setBusyAction(null)); } }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button>
+            </aside>
           </div>
         </>
       )}
