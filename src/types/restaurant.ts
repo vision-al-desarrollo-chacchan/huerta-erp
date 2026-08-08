@@ -44,3 +44,13 @@ export interface CashSession {
   difference?: number;
   notes?: string;
 }
+
+export interface CashMovement {
+  id: string;
+  type: 'ingreso' | 'egreso';
+  concept: string;
+  amount: number;
+  paymentMethod: string;
+  registeredByName: string;
+  createdAt: string;
+}
