@@ -1,44 +1,24 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
-
-interface ThemeContextType {
-  darkMode: boolean;
-  toggleDarkMode: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextType>({
-  darkMode: false,
-  toggleDarkMode: () => {},
-});
+import { ThemeContext } from "./theme-context";
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("theme") === "dark",
+  );
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-
-    if (saved === "dark") {
-      setDarkMode(true);
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
     setDarkMode((prev) => {
       const next = !prev;
 
-      if (next) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("theme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("theme", "light");
-      }
+      localStorage.setItem("theme", next ? "dark" : "light");
 
       return next;
     });
@@ -49,8 +29,4 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       {children}
     </ThemeContext.Provider>
   );
-}
-
-export function useTheme() {
-  return useContext(ThemeContext);
 }

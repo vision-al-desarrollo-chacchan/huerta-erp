@@ -1,5 +1,4 @@
 import { useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 
 interface Cliente {
   id: number;
@@ -41,7 +40,7 @@ export default function Clientes() {
   }
 
   return (
-    <DashboardLayout>
+    <div className="p-6">
       <h1
         style={{
           marginBottom: 25,
@@ -183,6 +182,6 @@ export default function Clientes() {
           </tbody>
         </table>
       </div>
-    </DashboardLayout>
+    </div>
   );
 }

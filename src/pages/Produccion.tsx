@@ -103,6 +103,29 @@ export interface ProductionConsumption {
   unit: string;
 }
 
+function createDailyClosure(
+  responsible: string,
+  producedItems: number,
+  cost: number,
+  estSales: number,
+  waste: number,
+  profit: number,
+): DailyClosure {
+  const now = new Date();
+
+  return {
+    id: now.getTime().toString(),
+    date: now.toLocaleDateString('es-PE'),
+    time: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+    responsible,
+    producedItems,
+    cost,
+    estSales,
+    waste,
+    profit,
+  };
+}
+
 // --- Interfaces para Formularios (Evita casteos as any) ---
 interface BatchFormData {
   product: string;
@@ -198,7 +221,7 @@ export default function Produccion() {
   const [finishedProducts, setFinishedProducts] = useState<FinishedProduct[]>(() => {
     try { const saved = localStorage.getItem('huerta_finishedProducts'); return saved ? (JSON.parse(saved) as FinishedProduct[]) : initialFinishedProducts; } catch { return initialFinishedProducts; }
   });
-  const [materials, setMaterials] = useState<RawMaterial[]>(() => {
+  const [materials] = useState<RawMaterial[]>(() => {
     try { const saved = localStorage.getItem('huerta_materials'); return saved ? (JSON.parse(saved) as RawMaterial[]) : initialMaterials; } catch { return initialMaterials; }
   });
   const [waste, setWaste] = useState<WasteRecord[]>(() => {
@@ -447,17 +470,14 @@ export default function Produccion() {
     
     const responsibleName = window.prompt('Nombre del responsable del cierre:', 'Admin') || 'Admin';
 
-    const newClosure: DailyClosure = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString('es-PE'),
-      time: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-      responsible: responsibleName,
-      producedItems: totalProducedItems,
-      cost: totalProductionCost,
-      estSales: actualRevenue,
-      waste: totalWasteCost,
-      profit: realProfit
-    };
+    const newClosure = createDailyClosure(
+      responsibleName,
+      totalProducedItems,
+      totalProductionCost,
+      actualRevenue,
+      totalWasteCost,
+      realProfit,
+    );
 
     setClosures([newClosure, ...closures]);
 
