@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Banknote, CheckCircle, LockKeyhole, WalletCards } from 'lucide-react';
-import { closeCash, getCashSession, getOrders, openCash, orderTotal, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
+import { closeCash, getCashSession, getCurrentStaffName, getOrders, openCash, orderTotal, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
 import type { CashSession, RestaurantOrder } from '../types/restaurant';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -13,11 +13,12 @@ export default function Caja() {
   const [error, setError] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [staffName, setStaffName] = useState('Usuario');
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     const load = async () => {
-      try { const [cash, currentOrders] = await Promise.all([getCashSession(), getOrders()]); setSession(cash); setOrders(currentOrders); }
+      try { const [cash, currentOrders, currentStaff] = await Promise.all([getCashSession(), getOrders(), getCurrentStaffName()]); setSession(cash); setOrders(currentOrders); setStaffName(currentStaff); }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar la caja.'); }
       finally { setLoading(false); }
     };
@@ -65,13 +66,14 @@ export default function Caja() {
         <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-blue-100 text-blue-600"><LockKeyhole /></div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Abrir caja</h2><p className="mt-2 text-sm text-slate-500">Registra el efectivo con el que empiezas el turno.</p>
+          <div className="mt-5 rounded-xl bg-blue-50 p-3 text-left dark:bg-blue-950/40"><p className="text-[11px] font-bold uppercase tracking-wide text-blue-500">Responsable de apertura</p><p className="mt-1 font-bold text-blue-900 dark:text-blue-100">{staffName}</p></div>
           <label className="mt-6 block text-left text-xs font-bold uppercase text-slate-500">Monto inicial</label><input type="number" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 text-center text-2xl font-black dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
           <button disabled={busyAction === 'open'} onClick={() => { setBusyAction('open'); void openCash(Number(amount)).then(refresh).catch((reason: Error) => setError(reason.message)).finally(() => setBusyAction(null)); }} className="mt-4 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60">{busyAction === 'open' ? 'Abriendo…' : 'Abrir turno'}</button>
         </div>
       ) : (
         <>
           <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <Metric icon={<Banknote />} label="Fondo inicial" value={money.format(session.openingAmount)} />
+            <Metric icon={<Banknote />} label={`Fondo inicial · ${session.openedByName ?? staffName}`} value={money.format(session.openingAmount)} />
             <Metric icon={<WalletCards />} label="Ventas cobradas" value={money.format(salesTotal)} />
             <Metric icon={<CheckCircle />} label="Efectivo esperado" value={money.format(expectedCash)} />
           </div>
@@ -80,7 +82,7 @@ export default function Caja() {
               <h2 className="mb-4 font-bold text-slate-900 dark:text-white">Pedidos pendientes de cobro</h2>
               <div className="space-y-3">{delivered.map((order) => <div key={order.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center"><div><strong className="dark:text-white">Pedido #{String(order.number).padStart(3, '0')}</strong><p className="text-sm capitalize text-slate-500">{order.table ?? order.serviceType} · {order.items.length} productos</p></div><div className="flex items-center gap-2"><strong className="mr-2 text-lg dark:text-white">{money.format(orderTotal(order))}</strong><select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"><option>Efectivo</option><option>Yape/Plin</option><option>Tarjeta</option><option>Transferencia</option></select><button disabled={busyAction === order.id} onClick={() => { void collect(order); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{busyAction === order.id ? 'Cobrando…' : 'Cobrar'}</button></div></div>)}{!delivered.length && <p className="rounded-xl border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400 dark:border-slate-700">No hay pedidos pendientes.</p>}</div>
             </section>
-            <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="font-bold text-slate-900 dark:text-white">Cerrar turno</h2><p className="mt-2 text-sm text-slate-500">Cuenta el efectivo físico antes de cerrar.</p><label className="mt-5 block text-xs font-bold uppercase text-slate-500">Efectivo contado</label><input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /><button disabled={busyAction === 'close'} onClick={() => { if (confirm('¿Cerrar la caja actual?')) { setBusyAction('close'); void closeCash(Number(amount)).then(refresh).catch((reason: Error) => setError(reason.message)).finally(() => setBusyAction(null)); } }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button></aside>
+            <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="font-bold text-slate-900 dark:text-white">Cerrar turno</h2><p className="mt-2 text-sm text-slate-500">Cuenta el efectivo físico antes de cerrar.</p><p className="mt-3 rounded-lg bg-slate-100 p-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Responsable del cierre: {staffName}</p><label className="mt-5 block text-xs font-bold uppercase text-slate-500">Efectivo contado</label><input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /><button disabled={busyAction === 'close'} onClick={() => { if (confirm('¿Cerrar la caja actual?')) { setBusyAction('close'); void closeCash(Number(amount)).then(refresh).catch((reason: Error) => setError(reason.message)).finally(() => setBusyAction(null)); } }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button></aside>
           </div>
         </>
       )}
