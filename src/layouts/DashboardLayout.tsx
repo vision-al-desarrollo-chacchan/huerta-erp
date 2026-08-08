@@ -1,13 +1,8 @@
 import { Outlet } from "react-router-dom";
-import type { ReactNode } from "react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 
-interface Props {
-  children?: ReactNode;
-}
-
-export default function DashboardLayout({ children }: Props) {
+export default function DashboardLayout() {
   return (
     <div className="flex min-h-screen bg-slate-50">
 
@@ -18,7 +13,7 @@ export default function DashboardLayout({ children }: Props) {
         <Header />
 
         <main className="flex-1 overflow-y-auto content-scroll">
-          {children ? children : <Outlet />}
+          <Outlet />
         </main>
 
       </div>

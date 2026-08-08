@@ -1,42 +1,49 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import DashboardLayout from "../layouts/DashboardLayout";
+import GuestRoute from "./GuestRoute";
+import ProtectedRoute from "./ProtectedRoute";
 
-import Login from "../pages/Login";
-import Dashboard from "../pages/Dashboard";
-import Ventas from "../pages/Ventas";
-import Compras from "../pages/Compras";
-import Inventario from "../pages/Inventario";
-import Clientes from "../pages/Clientes";
-import Proveedores from "../pages/Proveedores";
-import Caja from "../pages/Caja";
-import Reportes from "../pages/Reportes";
-import Usuarios from "../pages/Usuarios";
-import Configuracion from "../pages/Configuracion";
-
-import Contabilidad from "../pages/Contabilidad";
-import RecursosHumanos from "../pages/RecursosHumanos";
-import Produccion from "../pages/Produccion";
-import Documentos from "../pages/Documentos";
-
+const Login = lazy(() => import("../pages/Login"));
+const Dashboard = lazy(() => import("../pages/Dashboard"));
+const Ventas = lazy(() => import("../pages/Ventas"));
+const Compras = lazy(() => import("../pages/Compras"));
+const Inventario = lazy(() => import("../pages/Inventario"));
+const Clientes = lazy(() => import("../pages/Clientes"));
+const Proveedores = lazy(() => import("../pages/Proveedores"));
+const Caja = lazy(() => import("../pages/Caja"));
+const Reportes = lazy(() => import("../pages/Reportes"));
+const Usuarios = lazy(() => import("../pages/Usuarios"));
+const Configuracion = lazy(() => import("../pages/Configuracion"));
+const Contabilidad = lazy(() => import("../pages/Contabilidad"));
+const RecursosHumanos = lazy(() => import("../pages/RecursosHumanos"));
+const Produccion = lazy(() => import("../pages/Produccion"));
+const Documentos = lazy(() => import("../pages/Documentos"));
+const NotFound = lazy(() => import("../pages/NotFound"));
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
+      <Suspense fallback={<div className="p-6 text-slate-600">Cargando Huerta ERP...</div>}>
+        <Routes>
 
-      <Routes>
+        <Route element={<GuestRoute />}>
+          <Route path="/" element={<Login />} />
+        </Route>
 
-        <Route path="/" element={<Login />} />
-
-        <Route element={<DashboardLayout />}>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<DashboardLayout />}>
 
           <Route path="/dashboard" element={<Dashboard />} />
 
-          <Route path="/ventas" element={<Ventas />} />
+          <Route path="/ventas/*" element={<Ventas />} />
 
           <Route path="/compras" element={<Compras />} />
 
           <Route path="/inventario" element={<Inventario />} />
+
+          <Route path="/productos/*" element={<Inventario />} />
 
           <Route path="/clientes" element={<Clientes />} />
 
@@ -58,10 +65,12 @@ export default function AppRoutes() {
 
           <Route path="/documentos" element={<Documentos />} />
 
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Route>
-
-      </Routes>
-
+        <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

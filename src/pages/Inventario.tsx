@@ -8,8 +8,6 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
-  ArrowUpDown,
-  MoreVertical,
   CheckCircle,
   History,
   Calendar,
@@ -45,6 +43,16 @@ interface KardexMovement {
   type: 'Entrada por compra' | 'Salida por producción' | 'Salida por venta' | 'Ajuste';
   quantity: number;
   unit: string;
+  responsible: string;
+  notes: string;
+}
+
+type MovementType = KardexMovement['type'];
+
+interface MovementForm {
+  productId: string;
+  type: MovementType;
+  quantity: number;
   responsible: string;
   notes: string;
 }
@@ -112,7 +120,7 @@ export default function Inventario() {
 
   // --- Estados Formularios ---
   const [productForm, setProductForm] = useState({ code: '', name: '', category: 'Cárnicos', unit: 'unid', stock: 0, minStock: 0, expirationDate: '' });
-  const [movementForm, setMovementForm] = useState({ productId: '', type: 'Entrada por compra', quantity: 0, responsible: '', notes: '' });
+  const [movementForm, setMovementForm] = useState<MovementForm>({ productId: '', type: 'Entrada por compra', quantity: 0, responsible: '', notes: '' });
 
   // --- Lógica de Alertas y Vencimientos ---
   const getStockAlert = (stock: number, minStock: number) => {
@@ -796,7 +804,7 @@ export default function Inventario() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tipo de Movimiento</label>
-                  <select value={movementForm.type} onChange={e => setMovementForm({...movementForm, type: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none appearance-none text-slate-700">
+                  <select value={movementForm.type} onChange={e => setMovementForm({...movementForm, type: e.target.value as MovementType})} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none appearance-none text-slate-700">
                     <option value="Entrada por compra">Entrada por compra (+)</option>
                     <option value="Salida por producción">Salida por producción (-)</option>
                     <option value="Salida por venta">Salida por venta (-)</option>

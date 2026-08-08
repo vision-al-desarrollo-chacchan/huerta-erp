@@ -1,10 +1,25 @@
 import React from 'react';
-import { Search, Bell, MessageSquare, Calendar, Moon, Sun } from 'lucide-react';
+import { Search, Bell, MessageSquare, Calendar, LogOut, Moon, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../context/useTheme";
+import { logout } from '../services/auth';
 
 const Header: React.FC = () => {
   const { darkMode, toggleDarkMode } = useTheme();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    const { error } = await logout();
+
+    if (error) {
+      alert('No se pudo cerrar la sesión. Inténtalo nuevamente.');
+      return;
+    }
+
+    navigate('/', { replace: true });
+  };
+
   return (
     <header className="h-16 bg-white dark:bg-brand-surfaceDark border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-sm transition-colors w-full">
       
@@ -49,6 +64,15 @@ const Header: React.FC = () => {
           <button className="relative p-2 text-slate-500 hover:text-brand-blue hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
             <Bell className="w-5 h-5" />
             <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-brand-surfaceDark">4</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+          >
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
 
