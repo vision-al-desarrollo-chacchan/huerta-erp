@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Banknote, CheckCircle, LockKeyhole, WalletCards } from 'lucide-react';
-import { closeCash, getCashSession, getCurrentStaffName, getOrders, openCash, orderTotal, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
-import type { CashSession, RestaurantOrder } from '../types/restaurant';
+import { closeCash, getCashMovements, getCashSession, getCurrentStaffName, getOrders, openCash, orderTotal, registerCashMovement, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
+import type { CashMovement, CashSession, RestaurantOrder } from '../types/restaurant';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
@@ -16,11 +16,15 @@ export default function Caja() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [staffName, setStaffName] = useState('Usuario');
+  const [movements, setMovements] = useState<CashMovement[]>([]);
+  const [movementType, setMovementType] = useState<'ingreso' | 'egreso'>('egreso');
+  const [movementConcept, setMovementConcept] = useState('');
+  const [movementAmount, setMovementAmount] = useState('');
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     const load = async () => {
-      try { const [cash, currentOrders, currentStaff] = await Promise.all([getCashSession(), getOrders(), getCurrentStaffName()]); setSession(cash); setOrders(currentOrders); setStaffName(currentStaff); }
+      try { const [cash, currentOrders, currentStaff, currentMovements] = await Promise.all([getCashSession(), getOrders(), getCurrentStaffName(), getCashMovements()]); setSession(cash); setOrders(currentOrders); setStaffName(currentStaff); setMovements(currentMovements); }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar la caja.'); }
       finally { setLoading(false); }
     };
@@ -31,13 +35,15 @@ export default function Caja() {
   const delivered = orders.filter((order) => order.status === 'entregado');
   const paid = orders.filter((order) => order.status === 'pagado');
   const salesTotal = paid.reduce((sum, order) => sum + orderTotal(order), 0);
-  const expectedCash = (session?.openingAmount ?? 0) + paid.filter((order) => order.paymentMethod === 'Efectivo').reduce((sum, order) => sum + orderTotal(order), 0);
+  const paymentTotals = paid.reduce<Record<string, number>>((totals, order) => { const method = order.paymentMethod ?? 'Sin método'; totals[method] = (totals[method] ?? 0) + orderTotal(order); return totals; }, {});
+  const cashMovementNet = movements.filter((item) => item.paymentMethod === 'Efectivo').reduce((sum, item) => sum + (item.type === 'ingreso' ? item.amount : -item.amount), 0);
+  const expectedCash = (session?.openingAmount ?? 0) + (paymentTotals.Efectivo ?? 0) + cashMovementNet;
   const displayedCountedAmount = countedAmount === '' ? expectedCash.toFixed(2) : countedAmount;
   const closingDifference = Number(displayedCountedAmount) - expectedCash;
 
   async function refresh() {
-    const [cash, currentOrders] = await Promise.all([getCashSession(), getOrders()]);
-    setSession(cash); setOrders(currentOrders);
+    const [cash, currentOrders, currentMovements] = await Promise.all([getCashSession(), getOrders(), getCashMovements()]);
+    setSession(cash); setOrders(currentOrders); setMovements(currentMovements);
   }
 
   async function collect(order: RestaurantOrder) {
@@ -52,6 +58,14 @@ export default function Caja() {
     } finally {
       setBusyAction(null);
     }
+  }
+
+  async function saveMovement() {
+    if (!movementConcept.trim() || Number(movementAmount) <= 0) return;
+    setBusyAction('movement'); setError('');
+    try { await registerCashMovement({ type: movementType, concept: movementConcept, amount: Number(movementAmount) }); setMovementConcept(''); setMovementAmount(''); await refresh(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo registrar el movimiento.'); }
+    finally { setBusyAction(null); }
   }
 
   return (
@@ -80,6 +94,10 @@ export default function Caja() {
             <Metric icon={<Banknote />} label={`Fondo inicial · ${session.openedByName ?? staffName}`} value={money.format(session.openingAmount)} />
             <Metric icon={<WalletCards />} label="Ventas cobradas" value={money.format(salesTotal)} />
             <Metric icon={<CheckCircle />} label="Efectivo esperado" value={money.format(expectedCash)} />
+          </div>
+          <div className="mb-6 grid gap-4 lg:grid-cols-[1.25fr_1fr]">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 font-bold text-slate-900 dark:text-white">Ventas por método de pago</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{['Efectivo','Yape/Plin','Tarjeta','Transferencia'].map((method) => <div key={method} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] font-bold uppercase text-slate-400">{method}</p><strong className="mt-1 block text-slate-900 dark:text-white">{money.format(paymentTotals[method] ?? 0)}</strong></div>)}</div><p className="mt-3 text-xs text-slate-400">Solo el efectivo modifica el dinero físico esperado en caja.</p></section>
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-slate-900 dark:text-white">Caja chica</h2><div className="flex rounded-lg bg-slate-100 p-1 text-xs font-bold dark:bg-slate-800"><button onClick={() => setMovementType('egreso')} className={`rounded-md px-3 py-1.5 ${movementType === 'egreso' ? 'bg-red-600 text-white' : 'text-slate-500'}`}>Salida</button><button onClick={() => setMovementType('ingreso')} className={`rounded-md px-3 py-1.5 ${movementType === 'ingreso' ? 'bg-emerald-600 text-white' : 'text-slate-500'}`}>Ingreso</button></div></div><div className="grid gap-2 sm:grid-cols-[1fr_100px_auto]"><input value={movementConcept} onChange={(event) => setMovementConcept(event.target.value)} placeholder="Ej.: Compra de hielo" className="rounded-lg border border-slate-200 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" /><input type="number" min="0.01" step="0.01" value={movementAmount} onChange={(event) => setMovementAmount(event.target.value)} placeholder="S/ 0.00" className="rounded-lg border border-slate-200 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" /><button disabled={busyAction === 'movement' || !movementConcept.trim() || Number(movementAmount) <= 0} onClick={() => { void saveMovement(); }} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 dark:bg-blue-600">{busyAction === 'movement' ? 'Guardando…' : 'Registrar'}</button></div>{movements.length > 0 && <div className="mt-3 max-h-28 space-y-1 overflow-y-auto">{movements.slice(0,5).map((item) => <div key={item.id} className="flex justify-between text-xs"><span className="truncate text-slate-500">{item.concept}</span><strong className={item.type === 'ingreso' ? 'text-emerald-600' : 'text-red-600'}>{item.type === 'ingreso' ? '+' : '-'}{money.format(item.amount)}</strong></div>)}</div>}</section>
           </div>
           <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
