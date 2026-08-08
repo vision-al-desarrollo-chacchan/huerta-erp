@@ -14,6 +14,7 @@ export default function Ventas() {
   const [table, setTable] = useState('Mesa 1');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     getProducts().then(setProducts).catch((error: Error) => setNotice(error.message)).finally(() => setLoading(false));
@@ -44,14 +45,18 @@ export default function Ventas() {
   }
 
   async function sendOrder() {
+    if (sending) return;
+    setSending(true);
     setNotice('');
     const cash = await getCashSession().catch(() => null);
     if (!cash || cash.status !== 'abierta') {
       setNotice('Primero debes abrir la caja para registrar pedidos.');
+      setSending(false);
       return;
     }
     if (!cart.length) {
       setNotice('Agrega al menos un producto.');
+      setSending(false);
       return;
     }
     try {
@@ -60,6 +65,8 @@ export default function Ventas() {
       setNotice(`Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo registrar el pedido.');
+    } finally {
+      setSending(false);
     }
   }
 
@@ -105,7 +112,7 @@ export default function Ventas() {
         <div className="border-t border-slate-200 p-5 dark:border-slate-800">
           {notice && <p className={`mb-3 rounded-lg p-3 text-xs font-semibold ${notice.includes('correctamente') ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{notice}</p>}
           <div className="mb-4 flex items-end justify-between"><span className="text-sm font-semibold text-slate-500">Total</span><strong className="text-3xl text-slate-900 dark:text-white">{money.format(total)}</strong></div>
-          <button onClick={sendOrder} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700"><CheckCircle className="h-5 w-5" />Enviar a cocina</button>
+          <button disabled={sending} onClick={sendOrder} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : 'Enviar a cocina'}</button>
         </div>
       </aside>
     </div>
