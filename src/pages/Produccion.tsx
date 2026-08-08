@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   Plus, 
-  Filter, 
   Download,
   ChefHat,
   Flame,
@@ -13,8 +12,6 @@ import {
   ClipboardList,
   CheckCircle,
   Clock,
-  ArrowUpDown,
-  MoreVertical,
   Scale,
   UtensilsCrossed,
   Trash2,
@@ -28,7 +25,7 @@ import {
 } from 'lucide-react';
 
 // --- Interfaces ---
-interface ProductionBatch {
+export interface ProductionBatch {
   id: string;
   time: string;
   product: string;
@@ -39,7 +36,7 @@ interface ProductionBatch {
   cost: number;
 }
 
-interface FinishedProduct {
+export interface FinishedProduct {
   id: string;
   name: string;
   produced: number;
@@ -48,7 +45,7 @@ interface FinishedProduct {
   price: number; 
 }
 
-interface RawMaterial {
+export interface RawMaterial {
   id: string;
   name: string;
   category: string;
@@ -58,19 +55,22 @@ interface RawMaterial {
   unit: string;
 }
 
-interface Recipe {
+export interface RecipeIngredient {
+  name: string;
+  quantity: number;
+  qty?: number; // Tolerancia para datos antiguos almacenados
+  unit: string;
+}
+
+export interface Recipe {
   id: string;
   product: string;
   cost: number;
   salePrice: number;
-  ingredients: {
-    name: string;
-    quantity: number;
-    unit: string;
-  }[];
+  ingredients: RecipeIngredient[];
 }
 
-interface WasteRecord {
+export interface WasteRecord {
   id: string;
   product: string;
   quantity: number;
@@ -80,7 +80,7 @@ interface WasteRecord {
   lostCost: number;
 }
 
-interface DailyClosure {
+export interface DailyClosure {
   id: string;
   date: string;
   time: string;
@@ -93,7 +93,7 @@ interface DailyClosure {
 }
 
 // --- Nueva Interfaz para Conexión Futura con Inventario ---
-interface ProductionConsumption {
+export interface ProductionConsumption {
   id: string;
   date: string;
   productProduced: string;
@@ -101,6 +101,27 @@ interface ProductionConsumption {
   material: string;
   quantityConsumed: number;
   unit: string;
+}
+
+// --- Interfaces para Formularios (Evita casteos as any) ---
+interface BatchFormData {
+  product: string;
+  customName: string;
+  customCost: number;
+  customPrice: number;
+  quantity: number;
+  unit: string;
+  responsible: string;
+  status: ProductionBatch['status'];
+}
+
+interface WasteFormData {
+  product: string;
+  quantity: number;
+  unit: string;
+  reason: WasteRecord['reason'];
+  responsible: string;
+  lostCost: number;
 }
 
 // --- Datos de prueba iniciales ---
@@ -170,27 +191,27 @@ const initialRecipes: Recipe[] = [
 ];
 
 export default function Produccion() {
-  // --- Estados Persistentes (LocalStorage) ---
+  // --- Estados Persistentes (LocalStorage) con Tipeo Estricto ---
   const [batches, setBatches] = useState<ProductionBatch[]>(() => {
-    try { const saved = localStorage.getItem('huerta_batches'); return saved ? JSON.parse(saved) : initialBatches; } catch { return initialBatches; }
+    try { const saved = localStorage.getItem('huerta_batches'); return saved ? (JSON.parse(saved) as ProductionBatch[]) : initialBatches; } catch { return initialBatches; }
   });
   const [finishedProducts, setFinishedProducts] = useState<FinishedProduct[]>(() => {
-    try { const saved = localStorage.getItem('huerta_finishedProducts'); return saved ? JSON.parse(saved) : initialFinishedProducts; } catch { return initialFinishedProducts; }
+    try { const saved = localStorage.getItem('huerta_finishedProducts'); return saved ? (JSON.parse(saved) as FinishedProduct[]) : initialFinishedProducts; } catch { return initialFinishedProducts; }
   });
   const [materials, setMaterials] = useState<RawMaterial[]>(() => {
-    try { const saved = localStorage.getItem('huerta_materials'); return saved ? JSON.parse(saved) : initialMaterials; } catch { return initialMaterials; }
+    try { const saved = localStorage.getItem('huerta_materials'); return saved ? (JSON.parse(saved) as RawMaterial[]) : initialMaterials; } catch { return initialMaterials; }
   });
   const [waste, setWaste] = useState<WasteRecord[]>(() => {
-    try { const saved = localStorage.getItem('huerta_waste'); return saved ? JSON.parse(saved) : initialWaste; } catch { return initialWaste; }
+    try { const saved = localStorage.getItem('huerta_waste'); return saved ? (JSON.parse(saved) as WasteRecord[]) : initialWaste; } catch { return initialWaste; }
   });
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
-    try { const saved = localStorage.getItem('huerta_recipes'); return saved ? JSON.parse(saved) : initialRecipes; } catch { return initialRecipes; }
+    try { const saved = localStorage.getItem('huerta_recipes'); return saved ? (JSON.parse(saved) as Recipe[]) : initialRecipes; } catch { return initialRecipes; }
   });
   const [closures, setClosures] = useState<DailyClosure[]>(() => {
-    try { const saved = localStorage.getItem('huerta_closures'); return saved ? JSON.parse(saved) : []; } catch { return []; }
+    try { const saved = localStorage.getItem('huerta_closures'); return saved ? (JSON.parse(saved) as DailyClosure[]) : []; } catch { return []; }
   });
   const [consumptions, setConsumptions] = useState<ProductionConsumption[]>(() => {
-    try { const saved = localStorage.getItem('huerta_consumptions'); return saved ? JSON.parse(saved) : []; } catch { return []; }
+    try { const saved = localStorage.getItem('huerta_consumptions'); return saved ? (JSON.parse(saved) as ProductionConsumption[]) : []; } catch { return []; }
   });
 
   // --- Guardar en LocalStorage ---
@@ -209,18 +230,18 @@ export default function Produccion() {
   // --- Modales y Formularios ---
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [batchForm, setBatchForm] = useState({ product: '', customName: '', customCost: 0, customPrice: 0, quantity: 0, unit: 'unid', responsible: '', status: 'Preparando' });
+  const [batchForm, setBatchForm] = useState<BatchFormData>({ product: '', customName: '', customCost: 0, customPrice: 0, quantity: 0, unit: 'unid', responsible: '', status: 'Preparando' });
 
   const [isWasteModalOpen, setIsWasteModalOpen] = useState(false);
-  const [wasteForm, setWasteForm] = useState({ product: '', quantity: 0, unit: 'unid', reason: 'Quemado', responsible: '', lostCost: 0 });
+  const [wasteForm, setWasteForm] = useState<WasteFormData>({ product: '', quantity: 0, unit: 'unid', reason: 'Quemado', responsible: '', lostCost: 0 });
 
   // --- Cálculos de KPIs y Cierre Diario (Valores Reales del Estado) ---
   const totalProducedItems = finishedProducts.reduce((acc, p) => acc + p.produced, 0);
   const totalProductionCost = batches.reduce((acc, b) => acc + b.cost, 0);
-  const actualRevenue = finishedProducts.reduce((acc, p) => acc + (p.sold * p.price), 0); // Venta real en base a lo vendido
+  const actualRevenue = finishedProducts.reduce((acc, p) => acc + (p.sold * p.price), 0);
   const totalWasteCost = waste.reduce((acc, w) => acc + w.lostCost, 0);
-  const estimatedProfit = actualRevenue - totalProductionCost; // Margen bruto basado en ventas
-  const realProfit = actualRevenue - totalProductionCost - totalWasteCost; // Ganancia real = Ventas - Costo - Merma
+  const estimatedProfit = actualRevenue - totalProductionCost;
+  const realProfit = actualRevenue - totalProductionCost - totalWasteCost;
   
   const lowStockAlerts = materials.filter(m => m.currentStock <= m.minStock).length;
 
@@ -234,11 +255,11 @@ export default function Produccion() {
   const getMaterialAlert = (mat: RawMaterial) => {
     const shortName = mat.name.split(' ')[0];
     if (mat.currentStock <= mat.minStock * 0.5) {
-      return { level: 'critico', text: `🔴 Comprar urgente: ${shortName}`, color: 'text-rose-700 bg-rose-50 border-rose-200', icon: AlertTriangle };
+      return { level: 'critico' as const, text: `🔴 Comprar urgente: ${shortName}`, color: 'text-rose-700 bg-rose-50 border-rose-200', icon: AlertTriangle };
     } else if (mat.currentStock <= mat.minStock) {
-      return { level: 'bajo', text: `🟡 Próximo a comprar: ${shortName}`, color: 'text-amber-700 bg-amber-50 border-amber-200', icon: Clock };
+      return { level: 'bajo' as const, text: `🟡 Próximo a comprar: ${shortName}`, color: 'text-amber-700 bg-amber-50 border-amber-200', icon: Clock };
     } else {
-      return { level: 'suficiente', text: `🟢 Disponible: ${shortName}`, color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: CheckCircle };
+      return { level: 'suficiente' as const, text: `🟢 Disponible: ${shortName}`, color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: CheckCircle };
     }
   };
 
@@ -293,7 +314,7 @@ export default function Produccion() {
       quantity: Number(batchForm.quantity),
       unit: batchForm.unit,
       responsible: batchForm.responsible || 'Usuario',
-      status: batchForm.status as any,
+      status: batchForm.status,
       cost: estimatedCost
     };
 
@@ -306,7 +327,7 @@ export default function Produccion() {
         productProduced: finalProductName,
         quantityProduced: Number(batchForm.quantity),
         material: ing.name,
-        quantityConsumed: ing.quantity * Number(batchForm.quantity),
+        quantityConsumed: (ing.quantity ?? ing.qty ?? 0) * Number(batchForm.quantity),
         unit: ing.unit
       }));
       
@@ -338,7 +359,7 @@ export default function Produccion() {
     setBatchForm({ product: '', customName: '', customCost: 0, customPrice: 0, quantity: 0, unit: 'unid', responsible: '', status: 'Preparando' });
   };
 
-  const handleDeleteBatch = (id: string, product: string, quantity: number, status: string) => {
+  const handleDeleteBatch = (id: string, product: string, quantity: number, status: ProductionBatch['status']) => {
     if (!window.confirm('¿Eliminar esta orden de producción?')) return;
     setBatches(prev => prev.filter(b => b.id !== id));
     
@@ -367,7 +388,7 @@ export default function Produccion() {
       product: wasteForm.product,
       quantity: Number(wasteForm.quantity),
       unit: wasteForm.unit,
-      reason: wasteForm.reason as any,
+      reason: wasteForm.reason,
       responsible: wasteForm.responsible || 'Usuario',
       lostCost: Number(wasteForm.lostCost)
     };
@@ -385,8 +406,8 @@ export default function Produccion() {
   const handleRegisterSale = (id: string) => {
     const qtyStr = window.prompt('Ingrese la cantidad vendida:');
     if (!qtyStr) return;
-    const qty = parseInt(qtyStr, 10);
-    if (isNaN(qty) || qty <= 0) {
+    const quantityToSell = parseInt(qtyStr, 10);
+    if (isNaN(quantityToSell) || quantityToSell <= 0) {
       alert("⚠️ Cantidad inválida.");
       return;
     }
@@ -394,11 +415,11 @@ export default function Produccion() {
     setFinishedProducts(prev => prev.map(p => {
       if (p.id === id) {
         const available = p.produced - p.sold;
-        if (qty > available && p.produced > 0) {
+        if (quantityToSell > available && p.produced > 0) {
           alert(`❌ No hay suficiente stock en vitrina. Disponible: ${available}`);
           return p;
         }
-        return { ...p, sold: p.sold + qty };
+        return { ...p, sold: p.sold + quantityToSell };
       }
       return p;
     }));
@@ -825,7 +846,7 @@ export default function Produccion() {
                       {recipe.ingredients.map((ing, idx) => (
                         <li key={idx} className="flex justify-between text-sm items-center border-b border-slate-50 pb-2 last:border-0">
                           <span className="text-slate-700 flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-2"></span> {ing.name}</span>
-                          <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{ing.quantity} {ing.unit}</span>
+                          <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">{(ing.quantity ?? ing.qty ?? 0)} {ing.unit}</span>
                         </li>
                       ))}
                     </ul>
@@ -1078,7 +1099,7 @@ export default function Produccion() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Estado</label>
-                  <select value={batchForm.status} onChange={e => setBatchForm({...batchForm, status: e.target.value})} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
+                  <select value={batchForm.status} onChange={e => setBatchForm({...batchForm, status: e.target.value as ProductionBatch['status']})} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
                     <option value="Preparando">Preparando</option>
                     <option value="En Horno">En Horno / Cocción</option>
                     <option value="Terminado">Terminado (Listo para Vitrina)</option>
@@ -1140,7 +1161,7 @@ export default function Produccion() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Motivo</label>
-                  <select value={wasteForm.reason} onChange={e => setWasteForm({...wasteForm, reason: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none appearance-none">
+                  <select value={wasteForm.reason} onChange={e => setWasteForm({...wasteForm, reason: e.target.value as WasteRecord['reason']})} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none appearance-none">
                     <option value="Quemado">Quemado</option>
                     <option value="Vencido">Vencido</option>
                     <option value="Sobrante">Sobrante (Desechado)</option>
