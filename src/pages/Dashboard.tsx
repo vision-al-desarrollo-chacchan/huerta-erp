@@ -1,15 +1,25 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Banknote, ChefHat, CircleDollarSign, Clock3, Package, ShoppingBag } from 'lucide-react';
 import { getCashSession, getOrders, getProducts, orderTotal, subscribeRestaurantData } from '../services/restaurant-store';
-import type { RestaurantOrder } from '../types/restaurant';
+import type { RestaurantOrder, RestaurantProduct } from '../types/restaurant';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
 export default function Dashboard() {
-  const [orders, setOrders] = useState<RestaurantOrder[]>(getOrders);
-  const [cashOpen, setCashOpen] = useState(getCashSession()?.status === 'abierta');
-  const products = getProducts();
-  useEffect(() => subscribeRestaurantData(() => { setOrders(getOrders()); setCashOpen(getCashSession()?.status === 'abierta'); }), []);
+  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
+  const [cashOpen, setCashOpen] = useState(false);
+  const [products, setProducts] = useState<RestaurantProduct[]>([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    const load = async () => {
+      try { const [currentOrders, cash, currentProducts] = await Promise.all([getOrders(), getCashSession(), getProducts()]); setOrders(currentOrders); setCashOpen(cash?.status === 'abierta'); setProducts(currentProducts); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar el dashboard.'); }
+    };
+    void load();
+    void subscribeRestaurantData(load).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: Error) => setError(reason.message));
+    return () => unsubscribe?.();
+  }, []);
 
   const today = new Date().toDateString();
   const todayOrders = orders.filter((order) => new Date(order.createdAt).toDateString() === today && order.status !== 'anulado');
@@ -25,6 +35,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 dark:bg-slate-950 lg:p-6">
+      {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
       <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row md:items-end"><div><p className="text-sm font-bold text-blue-600">OPERACIÓN DE HOY</p><h1 className="text-3xl font-black text-slate-900 dark:text-white">Chicken Huerta</h1><p className="text-sm text-slate-500">Resumen de ventas, pedidos y cocina</p></div><span className={`w-fit rounded-full px-4 py-2 text-sm font-bold ${cashOpen ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>Caja {cashOpen ? 'abierta' : 'cerrada'}</span></div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={<CircleDollarSign />} label="Ventas de hoy" value={money.format(sales)} color="blue" />
