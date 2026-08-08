@@ -63,7 +63,11 @@ interface Recipe {
   product: string;
   cost: number;
   salePrice: number;
-  ingredients: { name: string; qty: string }[];
+  ingredients: {
+    name: string;
+    quantity: number;
+    unit: string;
+  }[];
 }
 
 interface WasteRecord {
