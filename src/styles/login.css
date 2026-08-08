@@ -1,0 +1,129 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
+}
+
+.login-container{
+    display:flex;
+    min-height:100vh;
+}
+
+.login-left{
+    flex:1;
+    background:linear-gradient(135deg,#071A52,#0B3D91,#00C8FF);
+    color:white;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    padding:60px;
+}
+
+.logo{
+    width:170px;
+    margin-bottom:25px;
+}
+
+.login-left h1{
+    font-size:56px;
+    font-weight:700;
+}
+
+.login-left p{
+    margin-top:15px;
+    font-size:22px;
+    max-width:500px;
+    text-align:center;
+    line-height:35px;
+}
+
+.features{
+    margin-top:50px;
+}
+
+.features div{
+    margin:18px 0;
+    font-size:20px;
+}
+
+.login-right{
+    width:480px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#F5F7FA;
+}
+
+.card{
+    width:390px;
+    background:white;
+    padding:45px;
+    border-radius:20px;
+    box-shadow:0 20px 45px rgba(0,0,0,.15);
+}
+
+.card h2{
+    text-align:center;
+    margin-bottom:35px;
+    color:#071A52;
+}
+
+.card span{
+    display:block;
+    margin-top:15px;
+    margin-bottom:8px;
+    color:#555;
+}
+
+.card input{
+    width:100%;
+    padding:15px;
+    border:1px solid #ddd;
+    border-radius:10px;
+    font-size:15px;
+    margin-bottom:15px;
+}
+
+.card input:focus{
+    outline:none;
+    border:1px solid #00C8FF;
+}
+
+.options{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin:20px 0;
+    font-size:14px;
+}
+
+.options a{
+    text-decoration:none;
+    color:#0B3D91;
+}
+
+button{
+    width:100%;
+    padding:16px;
+    border:none;
+    border-radius:10px;
+    background:#0B3D91;
+    color:white;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.3s;
+}
+
+button:hover{
+    background:#00A8E8;
+}
+
+small{
+    display:block;
+    margin-top:30px;
+    text-align:center;
+    color:#888;
+}
