@@ -8,6 +8,7 @@ import ProtectedRoute from "./ProtectedRoute";
 const Login = lazy(() => import("../pages/Login"));
 const Dashboard = lazy(() => import("../pages/Dashboard"));
 const Ventas = lazy(() => import("../pages/Ventas"));
+const Cocina = lazy(() => import("../pages/Cocina"));
 const Compras = lazy(() => import("../pages/Compras"));
 const Inventario = lazy(() => import("../pages/Inventario"));
 const Clientes = lazy(() => import("../pages/Clientes"));
@@ -38,6 +39,8 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<Dashboard />} />
 
           <Route path="/ventas/*" element={<Ventas />} />
+
+          <Route path="/cocina" element={<Cocina />} />
 
           <Route path="/compras" element={<Compras />} />
 
