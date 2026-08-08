@@ -19,6 +19,7 @@ import {
   Shield, 
   Settings, 
   HelpCircle,
+  ChefHat,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
@@ -91,6 +92,7 @@ const Sidebar: React.FC = () => {
 
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-6">Gestión y Operaciones</div>
         <NavLink to="/clientes" className={getNavLinkClass}><Users className="w-5 h-5" /> Clientes (CRM)</NavLink>
+        <NavLink to="/cocina" className={getNavLinkClass}><ChefHat className="w-5 h-5" /> Cocina & Comandas</NavLink>
         <NavLink to="/compras" className={getNavLinkClass}><Truck className="w-5 h-5" /> Compras & Prov.</NavLink>
         <NavLink to="/caja" className={getNavLinkClass}><Wallet className="w-5 h-5" /> Caja & Bancos</NavLink>
         <NavLink to="/contabilidad" className={getNavLinkClass}><Calculator className="w-5 h-5" /> Contabilidad</NavLink>
