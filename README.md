@@ -38,3 +38,7 @@ El archivo `public/_redirects` se copia automáticamente al build y permite reca
 ## Supabase
 
 El acceso al panel requiere una sesión válida de Supabase. Antes de publicar, confirma en Supabase Authentication que la URL de producción de Cloudflare esté autorizada cuando actives recuperación de contraseña, OAuth o enlaces enviados por correo.
+
+Las migraciones versionadas están en `supabase/migrations`. La migración
+`20260808220000_restaurant_core.sql` crea el núcleo gastronómico multiempresa,
+las políticas RLS, el alta inicial de Chicken Huerta y el flujo seguro de pedidos.
