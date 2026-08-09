@@ -5,6 +5,16 @@ import type { CashMovement, CashSession, RestaurantOrder } from '../types/restau
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
+function errorMessage(reason: unknown, fallback: string) {
+  if (reason instanceof Error) return reason.message;
+  if (reason && typeof reason === 'object') {
+    const value = reason as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [value.message, value.details, value.hint, value.code].filter((item) => typeof item === 'string' && item.length > 0);
+    if (parts.length) return parts.join(' · ');
+  }
+  return fallback;
+}
+
 export default function Caja() {
   const [session, setSession] = useState<CashSession | null>(null);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
@@ -78,7 +88,7 @@ export default function Caja() {
       setClosedReport({ session: closed, payments: { ...paymentTotals }, movements: [...movements] });
       setSession(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo cerrar la caja.');
+      setError(errorMessage(reason, 'No se pudo cerrar la caja.'));
     } finally {
       setBusyAction(null);
     }
