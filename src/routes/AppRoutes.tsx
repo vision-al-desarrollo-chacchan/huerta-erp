@@ -8,6 +8,9 @@ import ProtectedRoute from "./ProtectedRoute";
 const Login = lazy(() => import("../pages/Login"));
 const Dashboard = lazy(() => import("../pages/Dashboard"));
 const Ventas = lazy(() => import("../pages/Ventas"));
+const Pedidos = lazy(() => import("../pages/Pedidos"));
+const Facturacion = lazy(() => import("../pages/Facturacion"));
+const Cotizaciones = lazy(() => import("../pages/Cotizaciones"));
 const Cocina = lazy(() => import("../pages/Cocina"));
 const Compras = lazy(() => import("../pages/Compras"));
 const Inventario = lazy(() => import("../pages/Inventario"));
@@ -21,6 +24,7 @@ const Contabilidad = lazy(() => import("../pages/Contabilidad"));
 const RecursosHumanos = lazy(() => import("../pages/RecursosHumanos"));
 const Produccion = lazy(() => import("../pages/Produccion"));
 const Documentos = lazy(() => import("../pages/Documentos"));
+const Calendario = lazy(() => import("../pages/Calendario"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 
 export default function AppRoutes() {
@@ -38,7 +42,10 @@ export default function AppRoutes() {
 
           <Route path="/dashboard" element={<Dashboard />} />
 
-          <Route path="/ventas/*" element={<Ventas />} />
+          <Route path="/ventas/pos" element={<Ventas />} />
+          <Route path="/ventas/pedidos" element={<Pedidos />} />
+          <Route path="/ventas/facturacion" element={<Facturacion />} />
+          <Route path="/ventas/cotizaciones" element={<Cotizaciones />} />
 
           <Route path="/cocina" element={<Cocina />} />
 
@@ -67,6 +74,8 @@ export default function AppRoutes() {
           <Route path="/produccion" element={<Produccion />} />
 
           <Route path="/documentos" element={<Documentos />} />
+
+          <Route path="/calendario" element={<Calendario />} />
 
             <Route path="*" element={<NotFound />} />
           </Route>
