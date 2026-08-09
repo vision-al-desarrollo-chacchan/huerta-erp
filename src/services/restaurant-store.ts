@@ -37,14 +37,14 @@ export async function getProducts(): Promise<RestaurantProduct[]> {
 }
 
 type OrderRow = {
-  id: string; numero: number; tipo_servicio: ServiceType; mesa: string | null; cliente: string | null;
+  id: string; caja_id: string | null; numero: number; tipo_servicio: ServiceType; mesa: string | null; cliente: string | null;
   estado: OrderStatus; metodo_pago: string | null; created_at: string; updated_at: string;
   rest_pedido_items: { producto_id: string | null; nombre: string; cantidad: number; precio_unitario: number; notas: string | null }[];
 };
 
 function mapOrder(row: OrderRow): RestaurantOrder {
   return {
-    id: row.id, number: Number(row.numero), serviceType: row.tipo_servicio, table: row.mesa ?? undefined,
+    id: row.id, cashSessionId: row.caja_id ?? undefined, number: Number(row.numero), serviceType: row.tipo_servicio, table: row.mesa ?? undefined,
     customer: row.cliente ?? undefined, status: row.estado, paymentMethod: row.metodo_pago ?? undefined,
     createdAt: row.created_at, updatedAt: row.updated_at,
     items: (row.rest_pedido_items ?? []).map((item) => ({ productId: item.producto_id ?? '', name: item.nombre, quantity: Number(item.cantidad), unitPrice: Number(item.precio_unitario), notes: item.notas ?? undefined })),
@@ -53,7 +53,7 @@ function mapOrder(row: OrderRow): RestaurantOrder {
 
 export async function getOrders(): Promise<RestaurantOrder[]> {
   const { empresaId, sucursalId } = await context();
-  const { data, error } = await supabase.from('rest_pedidos').select('id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas)').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).order('created_at', { ascending: false }).limit(250);
+  const { data, error } = await supabase.from('rest_pedidos').select('id,caja_id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas)').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).order('created_at', { ascending: false }).limit(250);
   if (error) throw error;
   return ((data ?? []) as OrderRow[]).map(mapOrder);
 }
@@ -70,6 +70,7 @@ export async function createOrder(order: { serviceType: ServiceType; table?: str
   const created = Array.isArray(data) ? data[0] : data;
   return {
     id: created.id,
+    cashSessionId: cash.id,
     number: Number(created.numero),
     serviceType: order.serviceType,
     table: order.table,
