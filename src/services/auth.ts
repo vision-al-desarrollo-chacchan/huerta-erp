@@ -12,6 +12,7 @@ export async function register(email: string, password: string, fullName: string
 }
 
 export async function logout() {
+  sessionStorage.removeItem('huerta-active-operator');
   return await supabase.auth.signOut();
 }
 

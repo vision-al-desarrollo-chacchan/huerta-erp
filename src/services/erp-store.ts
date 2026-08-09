@@ -1,9 +1,10 @@
 import { supabase } from '../lib/supabase';
 import { getBusinessContext } from './restaurant-store';
+import { setActiveOperator, type ActiveOperator } from './operator-session';
 
 export type Client = { id: string; tipo_documento: string; numero_documento: string | null; nombre: string; telefono: string | null; email: string | null; direccion: string | null; activo: boolean; created_at: string };
 export type Supplier = { id: string; ruc: string | null; razon_social: string; contacto: string | null; telefono: string | null; email: string | null; direccion: string | null; condicion_pago: string; activo: boolean; created_at: string };
-export type Employee = { id: string; dni: string | null; nombres: string; apellidos: string; cargo: string; area: string; telefono: string | null; email: string | null; fecha_ingreso: string; sueldo: number; estado: 'activo' | 'inactivo'; created_at: string };
+export type Employee = { id: string; dni: string | null; nombres: string; apellidos: string; cargo: string; area: string; telefono: string | null; email: string | null; fecha_ingreso: string; sueldo: number; estado: 'activo' | 'inactivo'; acceso_rol?: 'cajero' | 'mozo' | 'cocina' | 'supervisor' | null; pin_actualizado_at?: string | null; created_at: string };
 export type ErpDocument = { id: string; nombre: string; categoria: string; descripcion: string | null; url: string | null; vence_at: string | null; created_at: string };
 export type Task = { id: string; titulo: string; descripcion: string | null; fecha: string; hora: string | null; prioridad: 'baja' | 'media' | 'alta'; estado: 'pendiente' | 'completada'; responsable: string | null; created_at: string };
 export type QuoteItem = { producto_id: string | null; descripcion: string; cantidad: number; precio: number };
@@ -98,5 +99,45 @@ export async function archiveRecord(table: 'erp_clientes' | 'erp_proveedores', i
 export async function setEmployeeStatus(id: string, estado: Employee['estado']) {
   const empresaId = await companyId();
   const { error } = await supabase.from('erp_empleados').update({ estado }).eq('id', id).eq('empresa_id', empresaId);
+  if (error) throw error;
+}
+
+
+export async function configureEmployeePin(employeeId: string, role: ActiveOperator['role'], pin: string) {
+  const empresaId = await companyId();
+  const { error } = await supabase.rpc('erp_configurar_pin_empleado', {
+    p_empresa_id: empresaId,
+    p_empleado_id: employeeId,
+    p_rol: role,
+    p_pin: pin,
+  });
+  if (error) throw error;
+}
+
+export async function activateEmployeeByPin(employeeId: string, pin: string): Promise<ActiveOperator> {
+  const empresaId = await companyId();
+  const { data, error } = await supabase.rpc('erp_validar_pin_empleado', {
+    p_empresa_id: empresaId,
+    p_empleado_id: employeeId,
+    p_pin: pin,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('No se pudo activar al trabajador.');
+  const operator: ActiveOperator = {
+    employeeId: row.empleado_id,
+    name: row.nombre,
+    role: row.rol,
+  };
+  setActiveOperator(operator);
+  return operator;
+}
+
+export async function removeEmployeePin(employeeId: string) {
+  const empresaId = await companyId();
+  const { error } = await supabase.rpc('erp_quitar_pin_empleado', {
+    p_empresa_id: empresaId,
+    p_empleado_id: employeeId,
+  });
   if (error) throw error;
 }
