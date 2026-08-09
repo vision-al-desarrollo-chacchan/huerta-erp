@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getActiveOperator } from './erp-store';
 import type { CashMovement, CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 
 type BusinessContext = { empresaId: string; sucursalId: string };
@@ -21,6 +22,8 @@ export async function getBusinessContext() {
 }
 
 export async function getCurrentStaffName() {
+  const operator = getActiveOperator();
+  if (operator) return operator.name;
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
   if (!user) return 'Usuario';
