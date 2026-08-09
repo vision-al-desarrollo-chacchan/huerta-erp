@@ -1,5 +1,5 @@
 import '../styles/login.css';
-import logo from '../assets/logo-horizontal.png';
+import logo from '../assets/logo-white.svg';
 import { useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, TicketCheck, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
