@@ -7,6 +7,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Menu,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -34,7 +35,9 @@ type Notice = {
   tone: "red" | "amber" | "blue" | "green";
 };
 
-const Header: React.FC = () => {
+type HeaderProps = { onOpenMenu?: () => void };
+
+const Header: React.FC<HeaderProps> = ({ onOpenMenu }) => {
   const { darkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
   const [company, setCompany] = useState("Empresa");
@@ -182,7 +185,8 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-brand-surfaceDark border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-sm transition-colors w-full">
+    <header className="z-10 flex h-16 w-full flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 shadow-sm transition-colors dark:border-slate-700 dark:bg-brand-surfaceDark sm:px-6">
+      <button type="button" onClick={onOpenMenu} className="mr-2 grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Abrir menú"><Menu className="h-6 w-6" /></button>
       {/* Selectores Multi-Tenant */}
       <div className="hidden md:flex items-center gap-4">
         <div className="flex flex-col">
@@ -205,7 +209,7 @@ const Header: React.FC = () => {
       </div>
 
       {/* Utilidades y Perfil */}
-      <div className="flex items-center gap-5 ml-auto">
+      <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-4 lg:gap-5">
         <div className="relative hidden lg:block">
           <input
             type="text"
@@ -215,7 +219,7 @@ const Header: React.FC = () => {
           <Search className="absolute left-3 top-2 w-4 h-4 text-slate-400" />
         </div>
 
-        <div className="flex items-center gap-3 border-r border-slate-200 dark:border-slate-700 pr-5">
+        <div className="flex items-center gap-1 border-r border-slate-200 pr-2 dark:border-slate-700 sm:gap-2 sm:pr-4">
           <button
             onClick={toggleDarkMode}
             className="p-2 text-slate-500 hover:text-brand-blue hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -249,7 +253,7 @@ const Header: React.FC = () => {
               )}
             </button>
             {notificationsOpen && (
-              <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+              <div className="fixed left-3 right-3 top-16 z-50 overflow-hidden rounded-2xl sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-80 border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
                 <div className="border-b p-4 font-black text-slate-900 dark:text-white">
                   Centro de notificaciones ({notifications.length})
                 </div>
