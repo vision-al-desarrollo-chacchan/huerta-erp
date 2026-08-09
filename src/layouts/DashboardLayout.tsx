@@ -1,15 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
-
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [location.pathname]);
 
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
