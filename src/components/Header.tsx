@@ -133,17 +133,20 @@ const Header: React.FC = () => {
         setNotifications(notices);
       });
     };
+    const loadStaff = () => { void getCurrentStaffName().then(setStaff); };
     load();
     loadNotifications();
-    void getCurrentStaffName().then(setStaff);
+    loadStaff();
     window.addEventListener("huerta-settings-updated", load);
     window.addEventListener("huerta-tasks-updated", loadNotifications);
     window.addEventListener("huerta-data-updated", loadNotifications);
+    window.addEventListener("huerta-operator-updated", loadStaff);
     const interval = window.setInterval(loadNotifications, 60000);
     return () => {
       window.removeEventListener("huerta-settings-updated", load);
       window.removeEventListener("huerta-tasks-updated", loadNotifications);
       window.removeEventListener("huerta-data-updated", loadNotifications);
+      window.removeEventListener("huerta-operator-updated", loadStaff);
       window.clearInterval(interval);
     };
   }, []);
