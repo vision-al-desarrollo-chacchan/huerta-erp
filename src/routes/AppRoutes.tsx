@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import GuestRoute from "./GuestRoute";
 import ProtectedRoute from "./ProtectedRoute";
+import OperatorRoute from "./OperatorRoute";
 
 const Login = lazy(() => import("../pages/Login"));
 const Dashboard = lazy(() => import("../pages/Dashboard"));
@@ -38,7 +39,7 @@ export default function AppRoutes() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<DashboardLayout />}>
+          <Route element={<OperatorRoute><DashboardLayout /></OperatorRoute>}>
 
           <Route path="/dashboard" element={<Dashboard />} />
 
