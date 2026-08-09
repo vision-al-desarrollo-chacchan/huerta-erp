@@ -43,12 +43,10 @@
 }
 
 .login-brand-logo {
-  width: 178px;
-  height: 78px;
-  margin: 0 auto 38px;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 4px;
+  width: 118px;
+  height: auto;
+  margin: 0 auto 28px;
+  object-fit: contain;
 }
 
 .login-brand h1 {
@@ -287,8 +285,8 @@
   }
 
   .login-brand-logo {
-    width: 140px;
-    height: 62px;
+    width: 104px;
+    height: auto;
     margin-bottom: 20px;
   }
 
