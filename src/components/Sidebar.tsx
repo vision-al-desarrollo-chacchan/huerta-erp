@@ -1,119 +1,85 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ShoppingBag, 
-  Package, 
-  Users, 
-  Truck, 
-  Wallet, 
-  Calculator, 
-  UserCheck, 
-  Factory, 
-  Wrench, 
-  Rocket, 
-  Calendar, 
-  Folder, 
-  FileText, 
-  Bot, 
-  Shield, 
-  Settings, 
-  HelpCircle,
-  ChefHat,
-  ChevronDown,
-  ChevronRight
+import {
+  LayoutDashboard, ShoppingBag, Package, Users, Truck, Wallet, Calculator,
+  UserCheck, Factory, Wrench, Rocket, Calendar, Folder, FileText, Bot,
+  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight,
 } from 'lucide-react';
+import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
+import { canOperatorAccess } from '../services/operator-permissions';
 
 const Sidebar: React.FC = () => {
-  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
-    ventas: true,
-    productos: false,
-  });
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({ ventas: true, productos: false });
+  const [operator, setOperator] = useState<ActiveOperator | null>(getActiveOperator());
 
-  const toggleMenu = (menu: string) => {
-    setOpenMenus((prev) => ({ ...prev, [menu]: !prev[menu] }));
-  };
+  useEffect(() => {
+    const refresh = () => setOperator(getActiveOperator());
+    window.addEventListener('huerta-operator-updated', refresh);
+    return () => window.removeEventListener('huerta-operator-updated', refresh);
+  }, []);
 
-  const baseLinkClass = "flex items-center gap-3 px-3 py-2 rounded-lg font-medium text-sm transition-colors w-full";
-  const activeClass = "bg-brand-blue/10 text-brand-cyan border border-brand-blue/20";
-  const inactiveClass = "text-slate-400 hover:bg-slate-800 hover:text-white";
-  const subLinkClass = "block py-1.5 text-sm text-slate-400 hover:text-white transition-colors w-full text-left pl-10 pr-3";
-  const activeSubLinkClass = "block py-1.5 text-sm text-brand-cyan transition-colors w-full text-left pl-10 pr-3 font-medium";
+  const allowed = (path: string) => !operator || canOperatorAccess(operator.role, path);
+  const toggleMenu = (menu: string) => setOpenMenus((previous) => ({ ...previous, [menu]: !previous[menu] }));
+  const base = 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors';
+  const active = 'border border-brand-blue/20 bg-brand-blue/10 text-brand-cyan';
+  const inactive = 'text-slate-400 hover:bg-slate-800 hover:text-white';
+  const link = ({ isActive }: { isActive: boolean }) => `${base} ${isActive ? active : inactive}`;
+  const sub = ({ isActive }: { isActive: boolean }) => `block w-full py-1.5 pl-10 pr-3 text-left text-sm transition-colors ${isActive ? 'font-medium text-brand-cyan' : 'text-slate-400 hover:text-white'}`;
 
-  const getNavLinkClass = ({ isActive }: { isActive: boolean }) => 
-    `${baseLinkClass} ${isActive ? activeClass : inactiveClass}`;
-    
-  const getSubNavLinkClass = ({ isActive }: { isActive: boolean }) => 
-    isActive ? activeSubLinkClass : subLinkClass;
+  return <aside className="z-20 flex h-screen w-72 flex-shrink-0 flex-col overflow-hidden border-r border-slate-800 bg-brand-dark text-slate-300 shadow-xl">
+    <div className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/50 px-6">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-blue to-brand-cyan text-lg font-bold text-white shadow-lg shadow-blue-500/20">H</div>
+      <div><h1 className="text-lg font-bold tracking-wide text-white">HUERTA ERP</h1>{operator && <p className="text-[10px] font-bold uppercase text-brand-cyan">{operator.role}</p>}</div>
+    </div>
 
-  return (
-    <aside className="w-72 bg-brand-dark text-slate-300 flex flex-col flex-shrink-0 border-r border-slate-800 shadow-xl z-20 h-screen overflow-hidden">
-      <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800 flex-shrink-0 bg-slate-900/50">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-blue to-brand-cyan flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/20">H</div>
-        <h1 className="text-white font-bold text-lg tracking-wide">HUERTA ERP</h1>
-      </div>
+    <div className="content-scroll flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <div className="mb-2 mt-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Principal</div>
+      {allowed('/dashboard') && <NavLink to="/dashboard" className={link}><LayoutDashboard className="h-5 w-5" /> Dashboard</NavLink>}
 
-      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 content-scroll">
-        
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-2">Principal</div>
-        <NavLink to="/dashboard" className={getNavLinkClass}>
-          <LayoutDashboard className="w-5 h-5" /> Dashboard
-        </NavLink>
-        
-        <div className="mt-1">
-          <button onClick={() => toggleMenu('ventas')} className={`${baseLinkClass} ${inactiveClass} justify-between`}>
-            <div className="flex items-center gap-3"><ShoppingBag className="w-5 h-5" /> Ventas</div>
-            {openMenus.ventas ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-          {openMenus.ventas && (
-            <div className="py-1 space-y-1">
-              <NavLink to="/ventas/pos" className={getSubNavLinkClass}>POS</NavLink>
-              <NavLink to="/ventas/cotizaciones" className={getSubNavLinkClass}>Cotizaciones</NavLink>
-              <NavLink to="/ventas/pedidos" className={getSubNavLinkClass}>Pedidos</NavLink>
-              <NavLink to="/ventas/facturacion" className={getSubNavLinkClass}>Facturación Electrónica</NavLink>
-            </div>
-          )}
-        </div>
+      {(allowed('/ventas/pos') || allowed('/ventas/pedidos') || allowed('/ventas/facturacion') || allowed('/ventas/cotizaciones')) && <div className="mt-1">
+        <button onClick={() => toggleMenu('ventas')} className={`${base} ${inactive} justify-between`}>
+          <div className="flex items-center gap-3"><ShoppingBag className="h-5 w-5" /> Ventas</div>
+          {openMenus.ventas ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+        {openMenus.ventas && <div className="space-y-1 py-1">
+          {allowed('/ventas/pos') && <NavLink to="/ventas/pos" className={sub}>POS</NavLink>}
+          {allowed('/ventas/cotizaciones') && <NavLink to="/ventas/cotizaciones" className={sub}>Cotizaciones</NavLink>}
+          {allowed('/ventas/pedidos') && <NavLink to="/ventas/pedidos" className={sub}>Pedidos</NavLink>}
+          {allowed('/ventas/facturacion') && <NavLink to="/ventas/facturacion" className={sub}>Facturación Electrónica</NavLink>}
+        </div>}
+      </div>}
 
-        <div className="mt-1">
-          <button onClick={() => toggleMenu('productos')} className={`${baseLinkClass} ${inactiveClass} justify-between`}>
-            <div className="flex items-center gap-3"><Package className="w-5 h-5" /> Productos</div>
-            {openMenus.productos ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-          {openMenus.productos && (
-            <div className="py-1 space-y-1">
-              <NavLink to="/inventario" className={getSubNavLinkClass}>Inventario y Recetas</NavLink>
-            </div>
-          )}
-        </div>
+      {(allowed('/inventario') || allowed('/productos')) && <div className="mt-1">
+        <button onClick={() => toggleMenu('productos')} className={`${base} ${inactive} justify-between`}>
+          <div className="flex items-center gap-3"><Package className="h-5 w-5" /> Productos</div>
+          {openMenus.productos ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+        {openMenus.productos && <div className="space-y-1 py-1"><NavLink to="/inventario" className={sub}>Inventario y Recetas</NavLink></div>}
+      </div>}
 
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-6">Gestión y Operaciones</div>
-        <NavLink to="/clientes" className={getNavLinkClass}><Users className="w-5 h-5" /> Clientes (CRM)</NavLink>
-        <NavLink to="/cocina" className={getNavLinkClass}><ChefHat className="w-5 h-5" /> Cocina & Comandas</NavLink>
-        <NavLink to="/compras" className={getNavLinkClass}><Truck className="w-5 h-5" /> Compras & Prov.</NavLink>
-        <NavLink to="/caja" className={getNavLinkClass}><Wallet className="w-5 h-5" /> Caja & Bancos</NavLink>
-        <NavLink to="/contabilidad" className={getNavLinkClass}><Calculator className="w-5 h-5" /> Contabilidad</NavLink>
-        <NavLink to="/recursos-humanos" className={getNavLinkClass}><UserCheck className="w-5 h-5" /> Recursos Humanos</NavLink>
-        <NavLink to="/produccion" className={getNavLinkClass}><Factory className="w-5 h-5" /> Producción</NavLink>
-        <NavLink to="/servicios" className={getNavLinkClass}><Wrench className="w-5 h-5" /> Servicios</NavLink>
-        <NavLink to="/proyectos" className={getNavLinkClass}><Rocket className="w-5 h-5" /> Proyectos</NavLink>
+      <div className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Gestión y Operaciones</div>
+      {allowed('/clientes') && <NavLink to="/clientes" className={link}><Users className="h-5 w-5" /> Clientes (CRM)</NavLink>}
+      {allowed('/cocina') && <NavLink to="/cocina" className={link}><ChefHat className="h-5 w-5" /> Cocina & Comandas</NavLink>}
+      {allowed('/compras') && <NavLink to="/compras" className={link}><Truck className="h-5 w-5" /> Compras & Prov.</NavLink>}
+      {allowed('/caja') && <NavLink to="/caja" className={link}><Wallet className="h-5 w-5" /> Caja & Bancos</NavLink>}
+      {allowed('/contabilidad') && <NavLink to="/contabilidad" className={link}><Calculator className="h-5 w-5" /> Contabilidad</NavLink>}
+      {allowed('/recursos-humanos') && <NavLink to="/recursos-humanos" className={link}><UserCheck className="h-5 w-5" /> Recursos Humanos</NavLink>}
+      {allowed('/produccion') && <NavLink to="/produccion" className={link}><Factory className="h-5 w-5" /> Producción</NavLink>}
+      {!operator && <><NavLink to="/servicios" className={link}><Wrench className="h-5 w-5" /> Servicios</NavLink><NavLink to="/proyectos" className={link}><Rocket className="h-5 w-5" /> Proyectos</NavLink></>}
 
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-6">Herramientas</div>
-        <NavLink to="/calendario" className={getNavLinkClass}><Calendar className="w-5 h-5" /> Calendario & Tareas</NavLink>
-        <NavLink to="/documentos" className={getNavLinkClass}><Folder className="w-5 h-5" /> Documentos</NavLink>
-        <NavLink to="/reportes" className={getNavLinkClass}><FileText className="w-5 h-5" /> Reportes</NavLink>
-        <NavLink to="/centro-ia" className={({ isActive }) => `${getNavLinkClass({ isActive })} justify-between`}>
-          <div className="flex items-center gap-3"><Bot className="w-5 h-5" /> Centro IA</div>
-          <span className="bg-brand-blue text-white text-[10px] font-bold px-1.5 py-0.5 rounded">BETA</span>
-        </NavLink>
+      <div className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Herramientas</div>
+      {allowed('/calendario') && <NavLink to="/calendario" className={link}><Calendar className="h-5 w-5" /> Calendario & Tareas</NavLink>}
+      {allowed('/documentos') && <NavLink to="/documentos" className={link}><Folder className="h-5 w-5" /> Documentos</NavLink>}
+      {allowed('/reportes') && <NavLink to="/reportes" className={link}><FileText className="h-5 w-5" /> Reportes</NavLink>}
+      {!operator && <NavLink to="/centro-ia" className={({ isActive }) => `${link({ isActive })} justify-between`}><div className="flex items-center gap-3"><Bot className="h-5 w-5" /> Centro IA</div><span className="rounded bg-brand-blue px-1.5 py-0.5 text-[10px] font-bold text-white">BETA</span></NavLink>}
 
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2 mt-6">Sistema</div>
-        <NavLink to="/usuarios" className={getNavLinkClass}><Shield className="w-5 h-5" /> Usuarios y Roles</NavLink>
-        <NavLink to="/configuracion" className={getNavLinkClass}><Settings className="w-5 h-5" /> Configuración</NavLink>
-        <NavLink to="/ayuda" className={getNavLinkClass}><HelpCircle className="w-5 h-5" /> Ayuda</NavLink>
-      </div>
-    </aside>
-  );
+      {!operator && <><div className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Sistema</div>
+        <NavLink to="/usuarios" className={link}><Shield className="h-5 w-5" /> Usuarios y Roles</NavLink>
+        <NavLink to="/configuracion" className={link}><Settings className="h-5 w-5" /> Configuración</NavLink>
+        <NavLink to="/ayuda" className={link}><HelpCircle className="h-5 w-5" /> Ayuda</NavLink>
+      </>}
+    </div>
+  </aside>;
 };
 
 export default Sidebar;
