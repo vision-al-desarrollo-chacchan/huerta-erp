@@ -82,10 +82,7 @@ const Sidebar: React.FC = () => {
           </button>
           {openMenus.productos && (
             <div className="py-1 space-y-1">
-              <NavLink to="/inventario" className={getSubNavLinkClass}>Inventario</NavLink>
-              <NavLink to="/productos/almacenes" className={getSubNavLinkClass}>Almacenes</NavLink>
-              <NavLink to="/productos/categorias" className={getSubNavLinkClass}>Categorías / Marcas</NavLink>
-              <NavLink to="/productos/kardex" className={getSubNavLinkClass}>Kardex</NavLink>
+              <NavLink to="/inventario" className={getSubNavLinkClass}>Inventario y Recetas</NavLink>
             </div>
           )}
         </div>
