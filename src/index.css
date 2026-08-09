@@ -105,3 +105,73 @@ a {
 .animate-zoomIn {
   animation: zoomIn .30s ease;
 }
+
+/* Adaptación global del ERP para tablet y móvil */
+.erp-main > * {
+  min-width: 0;
+}
+
+.erp-main img,
+.erp-main svg {
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .erp-main {
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .erp-main table {
+    white-space: nowrap;
+  }
+
+  .erp-main input,
+  .erp-main select,
+  .erp-main textarea,
+  .erp-main button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .erp-main > div {
+    padding: 1rem !important;
+  }
+
+  .erp-main h1 {
+    font-size: 1.75rem !important;
+    line-height: 2rem !important;
+  }
+
+  .erp-main h2 {
+    line-height: 1.35 !important;
+  }
+
+  .erp-main section,
+  .erp-main article {
+    max-width: 100%;
+  }
+
+  .erp-main .overflow-x-auto {
+    margin-left: -.25rem;
+    margin-right: -.25rem;
+    padding-left: .25rem;
+    padding-right: .25rem;
+    overscroll-behavior-inline: contain;
+  }
+
+  .erp-main table {
+    min-width: 640px;
+    font-size: .8125rem;
+  }
+
+  .erp-main th,
+  .erp-main td {
+    padding: .75rem !important;
+  }
+
+  .erp-main .fixed {
+    max-width: 100vw;
+  }
+}
