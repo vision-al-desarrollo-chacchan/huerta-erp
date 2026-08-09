@@ -47,7 +47,15 @@ export default function Usuarios() {
   };
 
   useEffect(() => {
-    void load().catch((reason) => setError(errorMessage(reason, 'No se pudieron cargar los accesos.')));
+    void Promise.all([getMembers(), getInvitations(), getEmployees()])
+      .then(([memberRows, invitationRows, employeeRows]) => {
+        setMembers(memberRows);
+        setInvites(invitationRows);
+        setEmployees(employeeRows);
+        setPinForm((current) => ({ ...current, employeeId: current.employeeId || employeeRows.find((row) => row.estado === 'activo')?.id || '' }));
+        setSwitchForm((current) => ({ ...current, employeeId: current.employeeId || employeeRows.find((row) => row.pin_actualizado_at)?.id || '' }));
+      })
+      .catch((reason) => setError(errorMessage(reason, 'No se pudieron cargar los accesos.')));
   }, []);
 
   const invite = async () => {
