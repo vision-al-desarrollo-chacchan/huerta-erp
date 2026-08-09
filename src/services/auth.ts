@@ -7,6 +7,10 @@ export async function login(email: string, password: string) {
   });
 }
 
+export async function register(email: string, password: string, fullName: string) {
+  return await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+}
+
 export async function logout() {
   return await supabase.auth.signOut();
 }
