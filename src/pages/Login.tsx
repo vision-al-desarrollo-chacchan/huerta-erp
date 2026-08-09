@@ -1,105 +1,118 @@
-import "../styles/login.css";
-import logo from "../assets/logo-square.png";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { login, register } from "../services/auth";
-import { acceptInvitation } from "../services/erp-store";
+import '../styles/login.css';
+import logo from '../assets/logo-horizontal.png';
+import { useState } from 'react';
+import { Eye, EyeOff, LockKeyhole, Mail, TicketCheck, UserRound } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { login, register } from '../services/auth';
+import { acceptInvitation } from '../services/erp-store';
 
 export default function Login() {
   const navigate = useNavigate();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [invite, setInvite] = useState(localStorage.getItem('huerta-invite') ?? "");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState('');
+  const [invite, setInvite] = useState(localStorage.getItem('huerta-invite') ?? '');
   const [registerMode, setRegisterMode] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
 
   async function handleLogin() {
     const { error } = await login(email, password);
-
     if (error) {
-      alert("Correo o contraseña incorrectos");
+      setMessage('Correo o contraseña incorrectos.');
       return;
     }
-
     if (invite.trim()) {
-      try { await acceptInvitation(invite.trim()); localStorage.removeItem('huerta-invite'); }
-      catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo aceptar la invitación.'); return; }
+      try {
+        await acceptInvitation(invite.trim());
+        localStorage.removeItem('huerta-invite');
+      } catch (reason) {
+        setMessage(reason instanceof Error ? reason.message : 'No se pudo aceptar la invitación.');
+        return;
+      }
     }
-    navigate("/dashboard");
+    navigate('/dashboard');
   }
 
   async function handleRegister() {
-    if (!name.trim() || password.length < 6 || !invite.trim()) { setMessage('Completa tu nombre, el código y una contraseña de mínimo 6 caracteres.'); return; }
+    if (!name.trim() || password.length < 6 || !invite.trim()) {
+      setMessage('Completa tu nombre, el código y una contraseña de mínimo 6 caracteres.');
+      return;
+    }
     localStorage.setItem('huerta-invite', invite.trim());
     const { data, error } = await register(email, password, name);
     if (error) return setMessage(error.message);
-    if (data.session) { try { await acceptInvitation(invite.trim()); localStorage.removeItem('huerta-invite'); navigate('/dashboard'); } catch (e) { setMessage(e instanceof Error ? e.message : 'No se pudo aceptar la invitación.'); } }
-    else setMessage('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión conservando el código.');
+    if (data.session) {
+      try {
+        await acceptInvitation(invite.trim());
+        localStorage.removeItem('huerta-invite');
+        navigate('/dashboard');
+      } catch (reason) {
+        setMessage(reason instanceof Error ? reason.message : 'No se pudo aceptar la invitación.');
+      }
+    } else {
+      setMessage('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión conservando el código.');
+    }
   }
 
-  return (
-    <div className="login-container">
-      <div className="login-left">
-        <img src={logo} alt="Huerta ERP" className="logo" />
-
+  return <main className="login-shell">
+    <section className="login-brand" aria-label="Huerta ERP">
+      <div className="brand-content">
+        <img src={logo} alt="Huerta Digital" className="login-brand-logo" />
         <h1>HUERTA ERP</h1>
-
         <p>Administra tu empresa desde cualquier lugar.</p>
-
-        <div className="features">
-          <div>✔ Multiempresa</div>
-          <div>✔ Seguro en la nube</div>
-          <div>✔ Rápido y moderno</div>
-        </div>
+        <ul>
+          <li>✓ Multiempresa</li>
+          <li>✓ Seguro en la nube</li>
+          <li>✓ Rápido y moderno</li>
+        </ul>
       </div>
+    </section>
 
-      <div className="login-right">
-        <div className="card">
-          <h2>{registerMode ? 'Crear acceso' : 'Bienvenido'}</h2>
+    <section className="login-panel">
+      <div className="login-card">
+        <header>
+          <h2>{registerMode ? '¡Crea tu acceso!' : '¡Bienvenido!'}</h2>
+          <p>{registerMode ? 'Usa la invitación entregada por tu administrador' : 'Ingresa tus credenciales para continuar'}</p>
+        </header>
 
-          {registerMode && <><span>Nombre completo</span><input placeholder="Nombre del trabajador" value={name} onChange={(e) => setName(e.target.value)} /></>}
+        {registerMode && <label className="login-field">
+          <span>Nombre completo</span>
+          <div><UserRound aria-hidden="true" /><input autoComplete="name" placeholder="Nombre del trabajador" value={name} onChange={(event) => setName(event.target.value)} /></div>
+        </label>}
 
+        <label className="login-field">
           <span>Correo electrónico</span>
+          <div><Mail aria-hidden="true" /><input type="email" autoComplete="email" placeholder="correo@empresa.com" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
+        </label>
 
-          <input
-            type="email"
-            placeholder="correo@empresa.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+        {registerMode && <label className="login-field">
+          <span>Código de invitación</span>
+          <div><TicketCheck aria-hidden="true" /><input autoComplete="off" placeholder="Código entregado por el administrador" value={invite} onChange={(event) => setInvite(event.target.value)} /></div>
+        </label>}
 
-          {registerMode && <><span>Código de invitación</span><input placeholder="Código entregado por el administrador" value={invite} onChange={(e) => setInvite(e.target.value)} /></>}
-
+        <label className="login-field">
           <span>Contraseña</span>
+          <div><LockKeyhole aria-hidden="true" /><input type={showPassword ? 'text' : 'password'} autoComplete={registerMode ? 'new-password' : 'current-password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? <EyeOff /> : <Eye />}</button></div>
+        </label>
 
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+        {!registerMode && <div className="login-options">
+          <label><input type="checkbox" /> <span>Recordarme</span></label>
+          <button type="button" className="forgot-link">¿Olvidaste tu contraseña?</button>
+        </div>}
 
-          <div className="options">
-            <label>
-              <input type="checkbox" />
-              Recordarme
-            </label>
+        {message && <p className={message.startsWith('Cuenta creada') ? 'login-message success' : 'login-message'}>{message}</p>}
 
-            <a href="#">¿Olvidaste tu contraseña?</a>
-          </div>
+        <button type="button" className="login-submit" onClick={() => void (registerMode ? handleRegister() : handleLogin())}>
+          {registerMode ? 'Crear mi acceso' : 'Iniciar sesión'}
+        </button>
 
-          {message && <p style={{color:'#b91c1c',fontSize:13,fontWeight:700}}>{message}</p>}
-          <button onClick={registerMode ? handleRegister : handleLogin}>
-            {registerMode ? 'Crear mi acceso' : 'Iniciar sesión'}
-          </button>
+        <button type="button" className="invite-link" onClick={() => { setRegisterMode((active) => !active); setMessage(''); }}>
+          {registerMode ? 'Ya tengo una cuenta' : 'Tengo un código de invitación'}
+        </button>
 
-          <button type="button" onClick={() => { setRegisterMode(!registerMode); setMessage(''); }} style={{background:'transparent',color:'#2563eb',boxShadow:'none'}}>{registerMode ? 'Ya tengo una cuenta' : 'Tengo un código de invitación'}</button>
-
-          <small>© 2026 Huerta Digital</small>
-        </div>
+        <small>© 2026 Huerta Digital</small>
       </div>
-    </div>
-  );
+    </section>
+  </main>;
 }
