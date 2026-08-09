@@ -41,6 +41,7 @@ export default function Calendario() {
         hora: f.hora || null,
         responsable: f.responsable || null,
       });
+      window.dispatchEvent(new Event("huerta-tasks-updated"));
       setF({ ...f, titulo: "", descripcion: "", hora: "", responsable: "" });
       await load();
     } catch (e) {
@@ -88,7 +89,10 @@ export default function Calendario() {
         >
           <option value="">Sin responsable</option>
           {employees.map((employee) => (
-            <option key={employee.id} value={`${employee.nombres} ${employee.apellidos}`}>
+            <option
+              key={employee.id}
+              value={`${employee.nombres} ${employee.apellidos}`}
+            >
               {employee.nombres} {employee.apellidos} · {employee.cargo}
             </option>
           ))}
@@ -146,6 +150,7 @@ export default function Calendario() {
                     r.id,
                     r.estado === "pendiente" ? "completada" : "pendiente",
                   );
+                  window.dispatchEvent(new Event("huerta-tasks-updated"));
                   await load();
                 }}
                 className="rounded-xl bg-slate-900 px-4 py-2 font-bold text-white"
