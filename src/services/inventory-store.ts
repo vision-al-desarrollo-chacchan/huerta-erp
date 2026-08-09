@@ -103,6 +103,36 @@ export async function saveSupply(input: Omit<Supply, "id"> & { id?: string }) {
     : await supabase.from("rest_insumos").insert(row);
   if (result.error) throw result.error;
 }
+export async function createSupply(input: Omit<Supply, "id">): Promise<Supply> {
+  const { empresaId } = await getBusinessContext();
+  const { data, error } = await supabase
+    .from("rest_insumos")
+    .insert({
+      empresa_id: empresaId,
+      codigo: input.code.trim(),
+      nombre: input.name.trim(),
+      categoria: input.category.trim(),
+      unidad: input.unit,
+      stock: input.stock,
+      stock_minimo: input.minStock,
+      costo_promedio: input.averageCost,
+    })
+    .select(
+      "id,codigo,nombre,categoria,unidad,stock,stock_minimo,costo_promedio",
+    )
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    code: data.codigo,
+    name: data.nombre,
+    category: data.categoria,
+    unit: data.unidad,
+    stock: Number(data.stock),
+    minStock: Number(data.stock_minimo),
+    averageCost: Number(data.costo_promedio),
+  };
+}
 export async function registerInventoryMovement(
   supplyId: string,
   type: string,
