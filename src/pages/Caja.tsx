@@ -11,7 +11,7 @@ export default function Caja() {
   const [amount, setAmount] = useState('100');
   const [countedAmount, setCountedAmount] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+  const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +47,7 @@ export default function Caja() {
   }
 
   async function collect(order: RestaurantOrder) {
+    const paymentMethod = paymentMethods[order.id] ?? 'Efectivo';
     setBusyAction(order.id);
     setError('');
     setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: 'pagado', paymentMethod } : item));
@@ -102,7 +103,7 @@ export default function Caja() {
           <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <h2 className="mb-4 font-bold text-slate-900 dark:text-white">Pedidos pendientes de cobro</h2>
-              <div className="space-y-3">{delivered.map((order) => <div key={order.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center"><div><strong className="dark:text-white">Pedido #{String(order.number).padStart(3, '0')}</strong><p className="text-sm capitalize text-slate-500">{order.table ?? order.serviceType} · {order.items.length} productos</p></div><div className="flex items-center gap-2"><strong className="mr-2 text-lg dark:text-white">{money.format(orderTotal(order))}</strong><select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"><option>Efectivo</option><option>Yape/Plin</option><option>Tarjeta</option><option>Transferencia</option></select><button disabled={busyAction === order.id} onClick={() => { void collect(order); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{busyAction === order.id ? 'Cobrando…' : 'Cobrar'}</button></div></div>)}{!delivered.length && <p className="rounded-xl border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400 dark:border-slate-700">No hay pedidos pendientes.</p>}</div>
+              <div className="space-y-3">{delivered.map((order) => <div key={order.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center"><div><strong className="dark:text-white">Pedido #{String(order.number).padStart(3, '0')}</strong><p className="text-sm capitalize text-slate-500">{order.table ?? order.serviceType} · {order.items.length} productos</p></div><div className="flex items-center gap-2"><strong className="mr-2 text-lg dark:text-white">{money.format(orderTotal(order))}</strong><select value={paymentMethods[order.id] ?? 'Efectivo'} onChange={(event) => setPaymentMethods((current) => ({ ...current, [order.id]: event.target.value }))} className="rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"><option>Efectivo</option><option>Yape/Plin</option><option>Tarjeta</option><option>Transferencia</option></select><button disabled={busyAction === order.id} onClick={() => { void collect(order); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{busyAction === order.id ? 'Cobrando…' : 'Cobrar'}</button></div></div>)}{!delivered.length && <p className="rounded-xl border border-dashed border-slate-300 py-12 text-center text-sm text-slate-400 dark:border-slate-700">No hay pedidos pendientes.</p>}</div>
             </section>
             <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <h2 className="font-bold text-slate-900 dark:text-white">Arqueo y cierre</h2><p className="mt-2 text-sm text-slate-500">Cuenta únicamente el efectivo físico de la caja.</p>
