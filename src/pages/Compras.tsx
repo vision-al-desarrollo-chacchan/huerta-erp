@@ -32,6 +32,19 @@ const initialSupply = {
   minStock: "",
   averageCost: "",
 };
+function nextSupplyCode(name: string, existing: Supply[]) {
+  const prefix = (
+    name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z]/g, "")
+      .slice(0, 3) || "INS"
+  ).toUpperCase();
+  const used = new Set(existing.map((item) => item.code.toUpperCase()));
+  let number = 1;
+  while (used.has(`${prefix}-${String(number).padStart(3, "0")}`)) number += 1;
+  return `${prefix}-${String(number).padStart(3, "0")}`;
+}
 function errorMessage(reason: unknown, fallback: string) {
   if (reason instanceof Error) return reason.message;
   if (reason && typeof reason === "object") {
@@ -103,11 +116,18 @@ export default function Compras() {
     setBusy(true);
     setError("");
     try {
+      const requestedCode = newSupply.code.trim().toUpperCase();
+      const code =
+        !requestedCode ||
+        supplies.some((item) => item.code.toUpperCase() === requestedCode)
+          ? nextSupplyCode(newSupply.name, supplies)
+          : requestedCode;
       const created = await createSupply({
         ...newSupply,
-        stock: Number(newSupply.stock || 0),
+        code,
+        stock: 0,
         minStock: Number(newSupply.minStock || 0),
-        averageCost: Number(newSupply.averageCost || 0),
+        averageCost: 0,
       });
       setSupplies((current) =>
         [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
@@ -210,6 +230,11 @@ export default function Compras() {
               Regístrala cuando la mercadería haya llegado. El stock aumentará
               una sola vez.
             </p>
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                {error}
+              </div>
+            )}
             <div className="mb-2 flex items-center justify-between">
               <b className="text-xs uppercase text-slate-700">Insumo</b>
               <button
@@ -225,13 +250,13 @@ export default function Compras() {
                   Nuevo insumo o producto
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Código">
+                  <Field label="Código (opcional)">
                     <input
                       value={newSupply.code}
                       onChange={(e) =>
                         setNewSupply({ ...newSupply, code: e.target.value })
                       }
-                      placeholder="PAP-001"
+                      placeholder="Se genera automáticamente"
                     />
                   </Field>
                   <Field label="Nombre">
@@ -278,25 +303,13 @@ export default function Compras() {
                       }
                     />
                   </Field>
-                  <Field label="Costo inicial">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="S/ 0.00"
-                      value={newSupply.averageCost}
-                      onChange={(e) =>
-                        setNewSupply({
-                          ...newSupply,
-                          averageCost: e.target.value,
-                        })
-                      }
-                    />
-                  </Field>
+                  <div className="rounded-xl bg-white p-3 text-xs font-semibold text-slate-600">
+                    El stock y costo comenzarán en cero. La compra recibida los
+                    calculará automáticamente.
+                  </div>
                 </div>
                 <button
-                  disabled={
-                    busy || !newSupply.code.trim() || !newSupply.name.trim()
-                  }
+                  disabled={busy || !newSupply.name.trim()}
                   onClick={() => void saveNewSupply()}
                   className="w-full rounded-xl bg-emerald-600 py-3 font-black text-white disabled:opacity-50"
                 >
