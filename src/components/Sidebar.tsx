@@ -3,12 +3,14 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Truck, Wallet, Calculator,
   UserCheck, Factory, Wrench, Rocket, Calendar, Folder, FileText, Bot,
-  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight,
+  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight, X,
 } from 'lucide-react';
 import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
 import { canOperatorAccess } from '../services/operator-permissions';
 
-const Sidebar: React.FC = () => {
+type SidebarProps = { open?: boolean; onClose?: () => void };
+
+const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({ ventas: true, productos: false });
   const [operator, setOperator] = useState<ActiveOperator | null>(getActiveOperator());
 
@@ -26,10 +28,10 @@ const Sidebar: React.FC = () => {
   const link = ({ isActive }: { isActive: boolean }) => `${base} ${isActive ? active : inactive}`;
   const sub = ({ isActive }: { isActive: boolean }) => `block w-full py-1.5 pl-10 pr-3 text-left text-sm transition-colors ${isActive ? 'font-medium text-brand-cyan' : 'text-slate-400 hover:text-white'}`;
 
-  return <aside className="z-20 flex h-screen w-72 flex-shrink-0 flex-col overflow-hidden border-r border-slate-800 bg-brand-dark text-slate-300 shadow-xl">
+  return <aside onClick={(event) => { if ((event.target as HTMLElement).closest('a')) onClose?.(); }} className={`fixed inset-y-0 left-0 z-40 flex h-screen w-[min(18rem,88vw)] flex-shrink-0 flex-col overflow-hidden border-r border-slate-800 bg-brand-dark text-slate-300 shadow-2xl transition-transform duration-300 lg:static lg:z-20 lg:w-72 lg:translate-x-0 lg:shadow-xl ${open ? 'translate-x-0' : '-translate-x-full'}`}>
     <div className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/50 px-6">
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-blue to-brand-cyan text-lg font-bold text-white shadow-lg shadow-blue-500/20">H</div>
-      <div><h1 className="text-lg font-bold tracking-wide text-white">HUERTA ERP</h1>{operator && <p className="text-[10px] font-bold uppercase text-brand-cyan">{operator.role}</p>}</div>
+      <div className="min-w-0 flex-1"><h1 className="text-lg font-bold tracking-wide text-white">HUERTA ERP</h1>{operator && <p className="text-[10px] font-bold uppercase text-brand-cyan">{operator.role}</p>}</div><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden" aria-label="Cerrar menú"><X className="h-5 w-5" /></button>
     </div>
 
     <div className="content-scroll flex-1 space-y-1 overflow-y-auto px-3 py-4">
