@@ -32,6 +32,15 @@ const initialSupply = {
   minStock: 0,
   averageCost: 0,
 };
+function errorMessage(reason: unknown, fallback: string) {
+  if (reason instanceof Error) return reason.message;
+  if (reason && typeof reason === "object") {
+    const value = reason as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [value.message, value.details, value.hint, value.code].filter((item) => typeof item === "string" && item.length > 0);
+    if (parts.length) return parts.join(" · ");
+  }
+  return fallback;
+}
 export default function Compras() {
   const [purchases, setPurchases] = useState<InventoryPurchase[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
@@ -50,9 +59,7 @@ export default function Compras() {
       setPurchases(a);
       setSupplies(b);
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "No se pudieron cargar las compras.",
-      );
+      setError(errorMessage(e, "No se pudieron cargar las compras."));
     }
   };
   useEffect(() => {
@@ -75,9 +82,7 @@ export default function Compras() {
       setOpen(false);
       await load();
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "No se pudo registrar la compra.",
-      );
+      setError(errorMessage(e, "No se pudo registrar la compra."));
     } finally {
       setBusy(false);
     }
@@ -94,7 +99,7 @@ export default function Compras() {
       setNewSupply(initialSupply);
       setCreatingSupply(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear el insumo.");
+      setError(errorMessage(e, "No se pudo crear el insumo."));
     } finally {
       setBusy(false);
     }
