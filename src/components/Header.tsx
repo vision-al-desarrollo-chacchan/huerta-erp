@@ -11,7 +11,8 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { useTheme } from "../context/useTheme";
-import { logout } from "../services/auth";
+import { logout, verifyCurrentPassword } from "../services/auth";
+import { clearActiveOperator, getActiveOperator } from "../services/operator-session";
 import {
   getCompanySettings,
   getDocuments,
@@ -151,6 +152,24 @@ const Header: React.FC = () => {
     };
   }, []);
 
+  const handleProfile = async () => {
+    const operator = getActiveOperator();
+    if (!operator) {
+      navigate('/usuarios');
+      return;
+    }
+    const password = window.prompt('Para volver al administrador, escribe su contraseña:');
+    if (!password) return;
+    const { error } = await verifyCurrentPassword(password);
+    if (error) {
+      alert('Contraseña del administrador incorrecta.');
+      return;
+    }
+    clearActiveOperator();
+    setStaff(await getCurrentStaffName());
+    navigate('/dashboard');
+  };
+
   const handleLogout = async () => {
     const { error } = await logout();
 
@@ -286,7 +305,7 @@ const Header: React.FC = () => {
         </div>
 
         {/* Perfil del Usuario */}
-        <div className="flex items-center gap-3 cursor-pointer">
+        <button type="button" onClick={() => void handleProfile()} className="flex items-center gap-3 cursor-pointer" title="Cambiar operador o administrar accesos">
           <div className="text-right hidden sm:block">
             <p className="max-w-28 truncate text-sm font-bold leading-tight text-slate-800 dark:text-white">
               {staff}
@@ -298,7 +317,7 @@ const Header: React.FC = () => {
           <div className="w-9 h-9 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-sm shadow-md">
             {staff.slice(0, 2).toUpperCase()}
           </div>
-        </div>
+        </button>
       </div>
     </header>
   );

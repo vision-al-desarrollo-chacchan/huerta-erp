@@ -23,3 +23,12 @@ export async function getUser() {
 
   return user;
 }
+
+
+export async function verifyCurrentPassword(password: string) {
+  const { data } = await supabase.auth.getSession();
+  const email = data.session?.user.email;
+  if (!email) return { error: new Error('No se encontró el correo del administrador.') };
+  const result = await supabase.auth.signInWithPassword({ email, password });
+  return { error: result.error };
+}
