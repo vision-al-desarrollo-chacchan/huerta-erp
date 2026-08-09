@@ -18,9 +18,9 @@ import {
 const initial = {
   supplyId: "",
   presentation: "Saco",
-  presentations: 1,
-  content: 1,
-  totalCost: 0,
+  presentations: "",
+  content: "",
+  totalCost: "",
   provider: "",
 };
 const initialSupply = {
@@ -28,15 +28,22 @@ const initialSupply = {
   name: "",
   category: "Verduras",
   unit: "kg",
-  stock: 0,
-  minStock: 0,
-  averageCost: 0,
+  stock: "",
+  minStock: "",
+  averageCost: "",
 };
 function errorMessage(reason: unknown, fallback: string) {
   if (reason instanceof Error) return reason.message;
   if (reason && typeof reason === "object") {
-    const value = reason as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
-    const parts = [value.message, value.details, value.hint, value.code].filter((item) => typeof item === "string" && item.length > 0);
+    const value = reason as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+    const parts = [value.message, value.details, value.hint, value.code].filter(
+      (item) => typeof item === "string" && item.length > 0,
+    );
     if (parts.length) return parts.join(" · ");
   }
   return fallback;
@@ -77,7 +84,12 @@ export default function Compras() {
     setBusy(true);
     setError("");
     try {
-      await registerInventoryPurchase(form);
+      await registerInventoryPurchase({
+        ...form,
+        presentations: Number(form.presentations),
+        content: Number(form.content),
+        totalCost: Number(form.totalCost),
+      });
       setForm(initial);
       setOpen(false);
       await load();
@@ -91,7 +103,12 @@ export default function Compras() {
     setBusy(true);
     setError("");
     try {
-      const created = await createSupply(newSupply);
+      const created = await createSupply({
+        ...newSupply,
+        stock: Number(newSupply.stock || 0),
+        minStock: Number(newSupply.minStock || 0),
+        averageCost: Number(newSupply.averageCost || 0),
+      });
       setSupplies((current) =>
         [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
       );
@@ -249,25 +266,28 @@ export default function Compras() {
                   </Field>
                   <Field label="Stock mínimo">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ej.: 20"
                       value={newSupply.minStock}
                       onChange={(e) =>
                         setNewSupply({
                           ...newSupply,
-                          minStock: +e.target.value,
+                          minStock: e.target.value,
                         })
                       }
                     />
                   </Field>
                   <Field label="Costo inicial">
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="S/ 0.00"
                       value={newSupply.averageCost}
                       onChange={(e) =>
                         setNewSupply({
                           ...newSupply,
-                          averageCost: +e.target.value,
+                          averageCost: e.target.value,
                         })
                       }
                     />
@@ -331,46 +351,56 @@ export default function Compras() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Cantidad de presentaciones">
                 <input
-                  type="number"
-                  step="0.001"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ej.: 1"
                   value={form.presentations}
                   onChange={(e) =>
-                    setForm({ ...form, presentations: +e.target.value })
+                    setForm({ ...form, presentations: e.target.value })
                   }
                 />
               </Field>
               <Field label={`Contenido por presentación (${unit})`}>
                 <input
-                  type="number"
-                  step="0.001"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ej.: 50"
                   value={form.content}
                   onChange={(e) =>
-                    setForm({ ...form, content: +e.target.value })
+                    setForm({ ...form, content: e.target.value })
                   }
                 />
               </Field>
             </div>
             <Field label="Costo total pagado">
-              <input
-                type="number"
-                step="0.01"
-                value={form.totalCost}
-                onChange={(e) =>
-                  setForm({ ...form, totalCost: +e.target.value })
-                }
-              />
+              <div className="flex overflow-hidden rounded-xl border-2 border-slate-200 bg-white">
+                <span className="grid place-items-center bg-slate-100 px-4 text-base font-black text-slate-800">
+                  S/
+                </span>
+                <input
+                  className="min-w-0 flex-1 border-0 p-3 font-bold outline-none"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={form.totalCost}
+                  onChange={(e) =>
+                    setForm({ ...form, totalCost: e.target.value })
+                  }
+                />
+              </div>
             </Field>
             <div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
               Ingreso:{" "}
               <b>
-                {(form.presentations * form.content).toFixed(3)} {unit}
+                {(Number(form.presentations) * Number(form.content)).toFixed(3)}{" "}
+                {unit}
               </b>{" "}
               · Costo de compra:{" "}
               <b>
                 S/{" "}
                 {(
-                  form.totalCost /
-                  Math.max(1, form.presentations * form.content)
+                  Number(form.totalCost) /
+                  Math.max(1, Number(form.presentations) * Number(form.content))
                 ).toFixed(2)}
               </b>{" "}
               por {unit}.
@@ -386,8 +416,9 @@ export default function Compras() {
                 disabled={
                   busy ||
                   !form.supplyId ||
-                  form.content <= 0 ||
-                  form.presentations <= 0
+                  Number(form.content) <= 0 ||
+                  Number(form.presentations) <= 0 ||
+                  Number(form.totalCost) < 0
                 }
                 onClick={() => void save()}
                 className="rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50"
