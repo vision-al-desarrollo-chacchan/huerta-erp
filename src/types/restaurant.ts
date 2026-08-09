@@ -43,6 +43,8 @@ export interface CashSession {
   expectedAmount?: number;
   difference?: number;
   notes?: string;
+  nextShiftFund?: number;
+  withdrawnAmount?: number;
 }
 
 export interface CashMovement {
