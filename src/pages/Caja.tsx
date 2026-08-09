@@ -44,8 +44,9 @@ export default function Caja() {
     void subscribeRestaurantData(load).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: Error) => setError(reason.message));
     return () => unsubscribe?.();
   }, []);
-  const delivered = orders.filter((order) => order.status === 'entregado');
-  const paid = orders.filter((order) => order.status === 'pagado');
+  const currentCashOrders = session ? orders.filter((order) => order.cashSessionId === session.id) : [];
+  const delivered = currentCashOrders.filter((order) => order.status === 'entregado');
+  const paid = currentCashOrders.filter((order) => order.status === 'pagado');
   const salesTotal = paid.reduce((sum, order) => sum + orderTotal(order), 0);
   const paymentTotals = paid.reduce<Record<string, number>>((totals, order) => { const method = order.paymentMethod ?? 'Sin método'; totals[method] = (totals[method] ?? 0) + orderTotal(order); return totals; }, {});
   const cashMovementNet = movements.filter((item) => item.paymentMethod === 'Efectivo').reduce((sum, item) => sum + (item.type === 'ingreso' ? item.amount : -item.amount), 0);

@@ -20,6 +20,7 @@ export interface OrderItem {
 
 export interface RestaurantOrder {
   id: string;
+  cashSessionId?: string;
   number: number;
   serviceType: ServiceType;
   table?: string;
