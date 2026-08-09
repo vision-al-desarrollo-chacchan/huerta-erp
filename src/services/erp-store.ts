@@ -1,10 +1,10 @@
 import { supabase } from '../lib/supabase';
 import { getBusinessContext } from './restaurant-store';
+import { setActiveOperator, type ActiveOperator } from './operator-session';
 
 export type Client = { id: string; tipo_documento: string; numero_documento: string | null; nombre: string; telefono: string | null; email: string | null; direccion: string | null; activo: boolean; created_at: string };
 export type Supplier = { id: string; ruc: string | null; razon_social: string; contacto: string | null; telefono: string | null; email: string | null; direccion: string | null; condicion_pago: string; activo: boolean; created_at: string };
 export type Employee = { id: string; dni: string | null; nombres: string; apellidos: string; cargo: string; area: string; telefono: string | null; email: string | null; fecha_ingreso: string; sueldo: number; estado: 'activo' | 'inactivo'; acceso_rol?: 'cajero' | 'mozo' | 'cocina' | 'supervisor' | null; pin_actualizado_at?: string | null; created_at: string };
-export type ActiveOperator = { employeeId: string; name: string; role: 'cajero' | 'mozo' | 'cocina' | 'supervisor' };
 export type ErpDocument = { id: string; nombre: string; categoria: string; descripcion: string | null; url: string | null; vence_at: string | null; created_at: string };
 export type Task = { id: string; titulo: string; descripcion: string | null; fecha: string; hora: string | null; prioridad: 'baja' | 'media' | 'alta'; estado: 'pendiente' | 'completada'; responsable: string | null; created_at: string };
 export type QuoteItem = { producto_id: string | null; descripcion: string; cantidad: number; precio: number };
@@ -103,22 +103,6 @@ export async function setEmployeeStatus(id: string, estado: Employee['estado']) 
 }
 
 
-const OPERATOR_KEY = 'huerta-active-operator';
-
-export function getActiveOperator(): ActiveOperator | null {
-  try {
-    const value = sessionStorage.getItem(OPERATOR_KEY);
-    return value ? JSON.parse(value) as ActiveOperator : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearActiveOperator() {
-  sessionStorage.removeItem(OPERATOR_KEY);
-  window.dispatchEvent(new Event('huerta-operator-updated'));
-}
-
 export async function configureEmployeePin(employeeId: string, role: ActiveOperator['role'], pin: string) {
   const empresaId = await companyId();
   const { error } = await supabase.rpc('erp_configurar_pin_empleado', {
@@ -145,8 +129,7 @@ export async function activateEmployeeByPin(employeeId: string, pin: string): Pr
     name: row.nombre,
     role: row.rol,
   };
-  sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(operator));
-  window.dispatchEvent(new Event('huerta-operator-updated'));
+  setActiveOperator(operator);
   return operator;
 }
 
