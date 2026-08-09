@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { getActiveOperator } from './erp-store';
+import { getActiveOperator } from './operator-session';
 import type { CashMovement, CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 
 type BusinessContext = { empresaId: string; sucursalId: string };
