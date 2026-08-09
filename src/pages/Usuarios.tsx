@@ -12,7 +12,7 @@ import {
   type Invitation,
   type Member,
 } from '../services/erp-store';
-import { clearActiveOperator, getActiveOperator, type ActiveOperator } from '../services/operator-session';
+import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
 
 const cls = 'rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600';
 const errorMessage = (reason: unknown, fallback: string) => typeof reason === 'object' && reason !== null && 'message' in reason && typeof reason.message === 'string' ? reason.message : fallback;
@@ -123,7 +123,6 @@ export default function Usuarios() {
         <input className={cls} type="password" inputMode="numeric" maxLength={6} placeholder="PIN de 6 números" value={switchForm.pin} onChange={(event) => setSwitchForm({ ...switchForm, pin: event.target.value.replace(/\D/g, '').slice(0, 6) })} />
         <button disabled={saving} onClick={() => void activate()} className="rounded-xl bg-slate-950 py-3 font-black text-white disabled:opacity-50">Activar operador</button>
       </div>
-      {activeOperator && <button onClick={() => { clearActiveOperator(); setActiveOperatorState(null); setNotice('Volviste al acceso del administrador.'); }} className="mt-3 text-sm font-black text-blue-600">Volver al administrador</button>}
     </section>
 
     <section className="rounded-2xl border bg-white p-5">
