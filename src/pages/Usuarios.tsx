@@ -15,6 +15,7 @@ import {
 import { clearActiveOperator, getActiveOperator, type ActiveOperator } from '../services/operator-session';
 
 const cls = 'rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-600';
+const errorMessage = (reason: unknown, fallback: string) => typeof reason === 'object' && reason !== null && 'message' in reason && typeof reason.message === 'string' ? reason.message : fallback;
 const roles: { value: ActiveOperator['role']; label: string }[] = [
   { value: 'cajero', label: 'Cajero' },
   { value: 'mozo', label: 'Mozo / vendedor' },
@@ -46,7 +47,7 @@ export default function Usuarios() {
   };
 
   useEffect(() => {
-    void load().catch((reason) => setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los accesos.'));
+    void load().catch((reason) => setError(errorMessage(reason, 'No se pudieron cargar los accesos.')));
   }, []);
 
   const invite = async () => {
@@ -59,7 +60,7 @@ export default function Usuarios() {
       setError('');
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo crear la invitación.');
+      setError(errorMessage(reason, 'No se pudo crear la invitación.'));
     } finally {
       setSaving(false);
     }
@@ -76,7 +77,7 @@ export default function Usuarios() {
       setError('');
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo configurar el PIN.');
+      setError(errorMessage(reason, 'No se pudo configurar el PIN.'));
     } finally {
       setSaving(false);
     }
@@ -92,7 +93,7 @@ export default function Usuarios() {
       setNotice(`Operador activo: ${operator.name} · ${operator.role}`);
       setError('');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'PIN incorrecto.');
+      setError(errorMessage(reason, 'PIN incorrecto.'));
     } finally {
       setSaving(false);
     }
