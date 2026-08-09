@@ -11,6 +11,7 @@ export default function Caja() {
   const [amount, setAmount] = useState('100');
   const [countedAmount, setCountedAmount] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
+  const [nextShiftFund, setNextShiftFund] = useState('100');
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export default function Caja() {
   const [movementType, setMovementType] = useState<'ingreso' | 'egreso'>('egreso');
   const [movementConcept, setMovementConcept] = useState('');
   const [movementAmount, setMovementAmount] = useState('');
+  const [closedReport, setClosedReport] = useState<{ session: CashSession; payments: Record<string, number>; movements: CashMovement[] } | null>(null);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -69,6 +71,19 @@ export default function Caja() {
     finally { setBusyAction(null); }
   }
 
+  async function finishCash() {
+    setBusyAction('close'); setError('');
+    try {
+      const closed = await closeCash(Number(displayedCountedAmount), Number(nextShiftFund), closingNotes);
+      setClosedReport({ session: closed, payments: { ...paymentTotals }, movements: [...movements] });
+      setSession(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo cerrar la caja.');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 dark:bg-slate-950 lg:p-6">
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
@@ -110,14 +125,35 @@ export default function Caja() {
               <p className="mt-3 rounded-lg bg-slate-100 p-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Responsable del cierre: {staffName}</p>
               <div className="mt-4 grid grid-cols-2 gap-2 text-center"><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-[10px] font-bold uppercase text-slate-400">Esperado</p><strong className="text-sm dark:text-white">{money.format(expectedCash)}</strong></div><div className={`rounded-lg p-3 ${Math.abs(closingDifference) < 0.01 ? 'bg-emerald-50 text-emerald-700' : closingDifference > 0 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'}`}><p className="text-[10px] font-bold uppercase">{Math.abs(closingDifference) < 0.01 ? 'Cuadrado' : closingDifference > 0 ? 'Sobrante' : 'Faltante'}</p><strong className="text-sm">{money.format(Math.abs(closingDifference))}</strong></div></div>
               <label className="mt-5 block text-xs font-bold uppercase text-slate-500">Efectivo contado</label><input type="number" min="0" step="0.01" value={displayedCountedAmount} onChange={(event) => setCountedAmount(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+              <label className="mt-4 block text-xs font-bold uppercase text-slate-500">Fondo siguiente turno</label><input type="number" min="0" max={displayedCountedAmount} step="0.01" value={nextShiftFund} onChange={(event) => setNextShiftFund(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /><p className="mt-2 text-xs text-slate-500">Efectivo a retirar: <strong>{money.format(Math.max(0, Number(displayedCountedAmount) - Number(nextShiftFund || 0)))}</strong></p>
               {Math.abs(closingDifference) >= 0.01 && <><label className="mt-4 block text-xs font-bold uppercase text-amber-600">Explicación obligatoria</label><textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Indica el motivo del sobrante o faltante..." className="mt-2 min-h-20 w-full rounded-xl border border-amber-300 p-3 text-sm dark:bg-slate-950 dark:text-white" /></>}
-              <button disabled={busyAction === 'close' || (Math.abs(closingDifference) >= 0.01 && !closingNotes.trim())} onClick={() => { if (confirm('¿Cerrar la caja actual?')) { setBusyAction('close'); void closeCash(Number(displayedCountedAmount), closingNotes).then(refresh).catch((reason: Error) => setError(reason.message)).finally(() => setBusyAction(null)); } }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button>
+              <button disabled={busyAction === 'close' || Number(nextShiftFund) < 0 || Number(nextShiftFund) > Number(displayedCountedAmount) || (Math.abs(closingDifference) >= 0.01 && !closingNotes.trim())} onClick={() => { if (confirm('¿Cerrar la caja actual?')) void finishCash(); }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button>
             </aside>
           </div>
         </>
       )}
+      {closedReport && <>
+        <style>{`@media print { body * { visibility: hidden !important; } #cash-close-receipt, #cash-close-receipt * { visibility: visible !important; } #cash-close-receipt { position: absolute !important; left: 0; top: 0; width: 72mm !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; color: #000 !important; background: #fff !important; } .receipt-actions { display: none !important; } } @page { size: 80mm auto; margin: 4mm; }`}</style>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+          <div id="cash-close-receipt" className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 text-slate-950 shadow-2xl">
+            <div className="text-center"><h2 className="text-xl font-black">CHICKEN HUERTA</h2><p className="text-xs">REPORTE DE CIERRE DE CAJA</p><p className="mt-1 text-xs">{new Date(closedReport.session.closedAt!).toLocaleString('es-PE')}</p></div>
+            <div className="my-4 border-y border-dashed border-slate-400 py-3 text-xs"><p>Apertura: {closedReport.session.openedByName}</p><p>Cierre: {closedReport.session.closedByName}</p><p>Inicio: {new Date(closedReport.session.openedAt).toLocaleString('es-PE')}</p><p>Fin: {new Date(closedReport.session.closedAt!).toLocaleString('es-PE')}</p></div>
+            <ReceiptRow label="Fondo inicial" value={money.format(closedReport.session.openingAmount)} />
+            {['Efectivo','Yape/Plin','Tarjeta','Transferencia'].map((method) => <ReceiptRow key={method} label={method} value={money.format(closedReport.payments[method] ?? 0)} />)}
+            {closedReport.movements.map((item) => <ReceiptRow key={item.id} label={`${item.type === 'ingreso' ? 'Ingreso' : 'Salida'}: ${item.concept}`} value={`${item.type === 'ingreso' ? '+' : '-'}${money.format(item.amount)}`} />)}
+            <div className="my-3 border-y border-dashed border-slate-400 py-3"><ReceiptRow label="Efectivo esperado" value={money.format(closedReport.session.expectedAmount ?? 0)} strong /><ReceiptRow label="Efectivo contado" value={money.format(closedReport.session.closingAmount ?? 0)} strong /><ReceiptRow label={(closedReport.session.difference ?? 0) < 0 ? 'Faltante' : 'Sobrante'} value={money.format(Math.abs(closedReport.session.difference ?? 0))} strong /><ReceiptRow label="Fondo siguiente turno" value={money.format(closedReport.session.nextShiftFund ?? 0)} strong /><ReceiptRow label="Efectivo retirado" value={money.format(closedReport.session.withdrawnAmount ?? 0)} strong /></div>
+            {closedReport.session.notes && <p className="text-xs"><b>Observación:</b> {closedReport.session.notes}</p>}
+            <div className="mt-10 grid grid-cols-2 gap-6 text-center text-[10px]"><div className="border-t border-black pt-1">Firma cajero</div><div className="border-t border-black pt-1">Firma administrador</div></div>
+            <div className="receipt-actions mt-6 grid gap-2"><button onClick={() => window.print()} className="rounded-xl bg-blue-600 py-3 font-bold text-white">Imprimir ticket / Guardar PDF</button><button onClick={() => setClosedReport(null)} className="rounded-xl bg-slate-100 py-3 font-bold text-slate-700">Cerrar reporte</button></div>
+          </div>
+        </div>
+      </>}
     </div>
   );
+}
+
+function ReceiptRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return <div className={`flex justify-between gap-3 text-xs ${strong ? 'font-bold' : ''}`}><span>{label}</span><span className="text-right">{value}</span></div>;
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
