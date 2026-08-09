@@ -91,10 +91,10 @@ export async function updateOrderStatus(id: string, status: OrderStatus, payment
 export async function getCashSession(force = false): Promise<CashSession | null> {
   if (!force && cachedCash !== undefined) return cachedCash;
   const { empresaId, sucursalId } = await context();
-  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,monto_esperado,diferencia,observaciones,estado,abierta_at,cerrada_at,abierta_por_nombre,cerrada_por_nombre').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
+  const { data, error } = await supabase.from('rest_cajas').select('id,monto_apertura,monto_cierre,monto_esperado,diferencia,observaciones,fondo_siguiente,efectivo_retirado,estado,abierta_at,cerrada_at,abierta_por_nombre,cerrada_por_nombre').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('estado', 'abierta').maybeSingle();
   if (error) throw error;
-  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), expectedAmount: data.monto_esperado == null ? undefined : Number(data.monto_esperado), difference: data.diferencia == null ? undefined : Number(data.diferencia), notes: data.observaciones ?? undefined, status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined, openedByName: data.abierta_por_nombre ?? undefined, closedByName: data.cerrada_por_nombre ?? undefined } : null;
-  return cachedCash;
+  cachedCash = data ? { id: data.id, openingAmount: Number(data.monto_apertura), closingAmount: data.monto_cierre == null ? undefined : Number(data.monto_cierre), expectedAmount: data.monto_esperado == null ? undefined : Number(data.monto_esperado), difference: data.diferencia == null ? undefined : Number(data.diferencia), notes: data.observaciones ?? undefined, nextShiftFund: Number(data.fondo_siguiente ?? 0), withdrawnAmount: data.efectivo_retirado == null ? undefined : Number(data.efectivo_retirado), status: data.estado, openedAt: data.abierta_at, closedAt: data.cerrada_at ?? undefined, openedByName: data.abierta_por_nombre ?? undefined, closedByName: data.cerrada_por_nombre ?? undefined } : null;
+  return cachedCash ?? null;
 }
 
 export async function openCash(openingAmount: number) {
@@ -105,12 +105,14 @@ export async function openCash(openingAmount: number) {
   return getCashSession(true);
 }
 
-export async function closeCash(closingAmount: number, notes?: string) {
+export async function closeCash(closingAmount: number, nextShiftFund: number, notes?: string) {
   const cash = await getCashSession();
   if (!cash) throw new Error('No existe una caja abierta.');
-  const { error } = await supabase.rpc('rest_cerrar_caja_con_arqueo', { p_caja_id: cash.id, p_monto_contado: closingAmount, p_observaciones: notes ?? null });
+  const { data, error } = await supabase.rpc('rest_cerrar_caja_con_fondo', { p_caja_id: cash.id, p_monto_contado: closingAmount, p_fondo_siguiente: nextShiftFund, p_observaciones: notes ?? null });
   if (error) throw error;
   cachedCash = null;
+  const row = Array.isArray(data) ? data[0] : data;
+  return { id: row.id, openingAmount: Number(row.monto_apertura), closingAmount: Number(row.monto_cierre), expectedAmount: Number(row.monto_esperado), difference: Number(row.diferencia), notes: row.observaciones ?? undefined, nextShiftFund: Number(row.fondo_siguiente), withdrawnAmount: Number(row.efectivo_retirado), status: row.estado, openedAt: row.abierta_at, closedAt: row.cerrada_at, openedByName: row.abierta_por_nombre ?? undefined, closedByName: row.cerrada_por_nombre ?? undefined } as CashSession;
 }
 
 export async function getCashMovements(): Promise<CashMovement[]> {
