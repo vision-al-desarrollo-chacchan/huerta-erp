@@ -7,6 +7,7 @@ import {
 } from "react";
 import { PackageCheck, Plus, ShoppingCart, Truck } from "lucide-react";
 import {
+  createSupply,
   getInventoryPurchases,
   getSupplies,
   registerInventoryPurchase,
@@ -22,6 +23,15 @@ const initial = {
   totalCost: 0,
   provider: "",
 };
+const initialSupply = {
+  code: "",
+  name: "",
+  category: "Verduras",
+  unit: "kg",
+  stock: 0,
+  minStock: 0,
+  averageCost: 0,
+};
 export default function Compras() {
   const [purchases, setPurchases] = useState<InventoryPurchase[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
@@ -29,6 +39,8 @@ export default function Compras() {
   const [form, setForm] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [creatingSupply, setCreatingSupply] = useState(false);
+  const [newSupply, setNewSupply] = useState(initialSupply);
   const load = async () => {
     try {
       const [a, b] = await Promise.all([
@@ -66,6 +78,23 @@ export default function Compras() {
       setError(
         e instanceof Error ? e.message : "No se pudo registrar la compra.",
       );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const saveNewSupply = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const created = await createSupply(newSupply);
+      setSupplies((current) =>
+        [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setForm((current) => ({ ...current, supplyId: created.id }));
+      setNewSupply(initialSupply);
+      setCreatingSupply(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo crear el insumo.");
     } finally {
       setBusy(false);
     }
@@ -151,13 +180,106 @@ export default function Compras() {
       </section>
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
-          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6">
-            <h2 className="text-xl font-black">Nueva compra recibida</h2>
-            <p className="mb-5 text-sm text-slate-500">
+          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
+            <h2 className="text-2xl font-black text-slate-950">
+              Nueva compra recibida
+            </h2>
+            <p className="mb-5 text-sm font-medium text-slate-600">
               Regístrala cuando la mercadería haya llegado. El stock aumentará
               una sola vez.
             </p>
-            <Field label="Insumo">
+            <div className="mb-2 flex items-center justify-between">
+              <b className="text-xs uppercase text-slate-700">Insumo</b>
+              <button
+                onClick={() => setCreatingSupply(!creatingSupply)}
+                className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700"
+              >
+                + Crear nuevo insumo
+              </button>
+            </div>
+            {creatingSupply && (
+              <div className="mb-4 rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-4">
+                <h3 className="mb-3 font-black text-emerald-900">
+                  Nuevo insumo o producto
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Código">
+                    <input
+                      value={newSupply.code}
+                      onChange={(e) =>
+                        setNewSupply({ ...newSupply, code: e.target.value })
+                      }
+                      placeholder="PAP-001"
+                    />
+                  </Field>
+                  <Field label="Nombre">
+                    <input
+                      value={newSupply.name}
+                      onChange={(e) =>
+                        setNewSupply({ ...newSupply, name: e.target.value })
+                      }
+                      placeholder="Papa Canchán"
+                    />
+                  </Field>
+                  <Field label="Categoría libre">
+                    <input
+                      value={newSupply.category}
+                      onChange={(e) =>
+                        setNewSupply({ ...newSupply, category: e.target.value })
+                      }
+                      placeholder="Verduras"
+                    />
+                  </Field>
+                  <Field label="Unidad base">
+                    <select
+                      value={newSupply.unit}
+                      onChange={(e) =>
+                        setNewSupply({ ...newSupply, unit: e.target.value })
+                      }
+                    >
+                      <option value="unidad">unidad</option>
+                      <option value="kg">kg</option>
+                      <option value="litro">litro</option>
+                    </select>
+                  </Field>
+                  <Field label="Stock mínimo">
+                    <input
+                      type="number"
+                      value={newSupply.minStock}
+                      onChange={(e) =>
+                        setNewSupply({
+                          ...newSupply,
+                          minStock: +e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Costo inicial">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newSupply.averageCost}
+                      onChange={(e) =>
+                        setNewSupply({
+                          ...newSupply,
+                          averageCost: +e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
+                <button
+                  disabled={
+                    busy || !newSupply.code.trim() || !newSupply.name.trim()
+                  }
+                  onClick={() => void saveNewSupply()}
+                  className="w-full rounded-xl bg-emerald-600 py-3 font-black text-white disabled:opacity-50"
+                >
+                  Guardar y seleccionar insumo
+                </button>
+              </div>
+            )}
+            <Field label="Seleccionar insumo existente">
               <select
                 value={form.supplyId}
                 onChange={(e) => setForm({ ...form, supplyId: e.target.value })}
@@ -274,17 +396,11 @@ export default function Compras() {
     </div>
   );
 }
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactElement;
-}) {
+function Field({ label, children }: { label: string; children: ReactElement }) {
   return (
-    <label className="mb-3 block text-xs font-bold uppercase text-slate-500">
+    <label className="mb-3 block text-xs font-black uppercase tracking-wide text-slate-700">
       {label}
-      <span className="mt-1 block [&>*]:w-full [&>*]:rounded-xl [&>*]:border [&>*]:p-3 [&>*]:font-normal [&>*]:normal-case">
+      <span className="mt-1 block [&>*]:w-full [&>*]:rounded-xl [&>*]:border-2 [&>*]:border-slate-200 [&>*]:bg-white [&>*]:p-3 [&>*]:font-semibold [&>*]:normal-case [&>*]:text-slate-900 focus-within:[&>*]:border-blue-500">
         {children}
       </span>
     </label>
