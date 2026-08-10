@@ -169,6 +169,7 @@ export async function subscribeProducts(listener: () => void, onStatus?: (status
     refreshTimer = window.setTimeout(listener, 120);
   };
   const channel = supabase.channel(`rest-productos-${empresaId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_productos' }, refresh)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') onStatus?.('connected');
       else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onStatus?.('error');
@@ -190,7 +191,6 @@ export async function subscribeRestaurantData(listener: () => void, onStatus?: (
   const channel = supabase.channel(`rest-operacion-${empresaId}-${sucursalId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedido_items' }, refresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_productos' }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, () => { cachedCash = undefined; refresh(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_movimientos_caja', filter: `empresa_id=eq.${empresaId}` }, refresh)
     .subscribe((status) => {
