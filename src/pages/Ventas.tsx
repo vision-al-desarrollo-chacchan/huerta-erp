@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
-import { createOrder, createProduct, getCashSession, getProducts, subscribeRestaurantData } from '../services/restaurant-store';
-import type { OrderItem, RestaurantProduct, ServiceType } from '../types/restaurant';
+import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
+import { createOrder, createProduct, getCashSession, getOrders, getProducts, subscribeRestaurantData } from '../services/restaurant-store';
+import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { useNotification } from '../context/notification-context';
 import { userErrorMessage } from '../lib/errors';
 
@@ -9,6 +9,7 @@ const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN
 
 export default function Ventas() {
   const [products, setProducts] = useState<RestaurantProduct[]>([]);
+  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Todas');
@@ -25,14 +26,14 @@ export default function Ventas() {
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | undefined;
-    const loadProducts = () => {
-      getProducts()
-        .then((rows) => { if (active) setProducts(rows); })
+    const load = () => {
+      Promise.all([getProducts(), getOrders()])
+        .then(([productRows, orderRows]) => { if (active) { setProducts(productRows); setOrders(orderRows); } })
         .catch((reason: unknown) => { if (active) { const message = userErrorMessage(reason, 'No se pudieron cargar los productos.'); setNotice(message); notify(message, 'error'); } })
         .finally(() => { if (active) setLoading(false); });
     };
-    loadProducts();
-    void subscribeRestaurantData(loadProducts)
+    load();
+    void subscribeRestaurantData(load)
       .then((cleanup) => { unsubscribe = cleanup; })
       .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudo activar la actualización del catálogo.'), 'error'); });
     return () => { active = false; unsubscribe?.(); };
@@ -45,6 +46,10 @@ export default function Ventas() {
     return product.active && matchesCategory && matchesSearch;
   });
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0), [cart]);
+  const occupiedTables = useMemo(() => new Set(orders
+    .filter((order) => order.serviceType === 'salon' && !['pagado', 'anulado'].includes(order.status) && order.table)
+    .map((order) => order.table as string)), [orders]);
+  const tables = Array.from({ length: 12 }, (_, index) => `Mesa ${index + 1}`);
 
   function addProduct(productId: string) {
     const product = products.find((item) => item.id === productId);
@@ -130,7 +135,7 @@ export default function Ventas() {
           <div className="flex gap-2"><button disabled={savingProduct} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{savingProduct ? 'Guardando…' : 'Guardar'}</button><button type="button" onClick={() => setShowProductForm(false)} className="rounded-xl border border-slate-200 p-3 text-slate-500 dark:border-slate-700"><X className="h-5 w-5" /></button></div>
         </form>}
         {loading && <p className="py-10 text-center text-sm text-slate-400">Cargando productos...</p>}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product) => (
             <button key={product.id} onClick={() => addProduct(product.id)} className="min-h-36 touch-manipulation rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg active:scale-[0.98] active:border-blue-600 active:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:active:bg-slate-800">
               <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-800">{product.category}</span>
@@ -145,7 +150,19 @@ export default function Ventas() {
         <div className="border-b border-slate-200 p-5 dark:border-slate-800">
           <div className="mb-4 flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-blue-600" /><h2 className="font-bold text-slate-900 dark:text-white">Nuevo pedido</h2></div>
           <div className="grid grid-cols-3 gap-2">{(['salon', 'delivery', 'recojo'] as ServiceType[]).map((type) => <button key={type} onClick={() => setServiceType(type)} className={`rounded-lg py-2 text-xs font-bold capitalize ${serviceType === type ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>{type}</button>)}</div>
-          {serviceType === 'salon' && <select value={table} onChange={(event) => setTable(event.target.value)} className="mt-3 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">{Array.from({ length: 12 }, (_, index) => <option key={index}>Mesa {index + 1}</option>)}</select>}
+          {serviceType === 'salon' && <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between"><strong className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">Selecciona una mesa</strong><span className="text-[10px] font-bold text-slate-400">Verde libre · Rojo ocupada</span></div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3">
+              {tables.map((item) => {
+                const occupied = occupiedTables.has(item);
+                const selected = table === item;
+                return <button key={item} type="button" onClick={() => setTable(item)} className={`relative rounded-xl border px-2 py-3 text-xs font-black transition ${selected ? 'border-blue-600 bg-blue-600 text-white shadow-md' : occupied ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                  <Users className="mx-auto mb-1 h-4 w-4" />{item.replace('Mesa ', 'Mesa ')}
+                  {occupied && !selected && <span className="mt-1 block text-[9px] uppercase">Ocupada</span>}
+                </button>;
+              })}
+            </div>
+          </div>}
         </div>
         <div className="min-h-56 flex-1 space-y-2 overflow-y-auto p-4">
           {!cart.length && <div className="py-14 text-center text-sm text-slate-400">Selecciona productos para comenzar.</div>}
