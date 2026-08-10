@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
 import { createOrder, createProduct, getCashSession, getOrders, getProducts, subscribeRestaurantData } from '../services/restaurant-store';
 import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
+import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
 import { userErrorMessage } from '../lib/errors';
 
@@ -102,6 +103,9 @@ export default function Ventas() {
     }
     try {
       const order = await createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
+      void enqueueOrderPrint(order, 'cocina').catch(() => {
+        // La venta queda guardada; la alerta y el reintento se muestran en el centro de impresión.
+      });
       setCart([]);
       setNotice(`Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`);
       notify(`Pedido #${String(order.number).padStart(3, '0')} enviado a cocina.`, 'success');
