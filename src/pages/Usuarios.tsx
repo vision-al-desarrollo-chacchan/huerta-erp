@@ -19,6 +19,7 @@ const errorMessage = (reason: unknown, fallback: string) => typeof reason === 'o
 const roles: { value: ActiveOperator['role']; label: string }[] = [
   { value: 'cajero', label: 'Cajero' },
   { value: 'mozo', label: 'Mozo / vendedor' },
+  { value: 'moza_cajera', label: 'Moza + Cajera' },
   { value: 'cocina', label: 'Cocina' },
   { value: 'supervisor', label: 'Supervisor' },
 ];
