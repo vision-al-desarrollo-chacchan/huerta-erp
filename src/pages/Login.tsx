@@ -111,6 +111,8 @@ export default function Login() {
           {registerMode ? 'Ya tengo una cuenta' : 'Tengo un código de invitación'}
         </button>
 
+        {!registerMode && <button type="button" className="invite-link" onClick={() => navigate('/demo')}>Ver demostración gratuita</button>}
+
         <small>© 2026 Huerta Digital</small>
       </div>
     </section>
