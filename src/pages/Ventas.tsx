@@ -117,22 +117,22 @@ export default function Ventas() {
   return (
     <div className="flex min-h-[calc(100vh-4rem)] min-w-0 flex-col overflow-x-hidden bg-slate-100 dark:bg-slate-950 lg:flex-row">
       <section className="min-w-0 flex-1 p-4 lg:p-6">
-        <div className="mb-4 flex min-w-0 flex-col gap-3 xl:flex-row">
-          <div className="relative flex-1">
+        <div className="mb-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="relative min-w-0">
             <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar plato o bebida..." className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar plato o bebida..." className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
           </div>
-          <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
-            {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${category === item ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item}</button>)}
-          </div>
-          <button onClick={() => setShowProductForm(true)} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-5 w-5" />Agregar plato</button>
+          <button onClick={() => setShowProductForm(true)} className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 sm:w-auto"><Plus className="h-5 w-5" />Agregar plato</button>
         </div>
-        {showProductForm && <form onSubmit={saveProduct} className="mb-4 grid gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900 md:grid-cols-[1fr_1fr_160px_auto]">
-          <input required value={newProduct.name} onChange={(event) => setNewProduct((current) => ({ ...current, name: event.target.value }))} placeholder="Nombre del plato" className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
-          <input required value={newProduct.category} onChange={(event) => setNewProduct((current) => ({ ...current, category: event.target.value }))} list="menu-categories" placeholder="Categoría" className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+        <div className="mb-4 flex min-w-0 gap-2 overflow-x-auto pb-2">
+          {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${category === item ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item}</button>)}
+        </div>
+        {showProductForm && <form onSubmit={saveProduct} className="mb-4 grid min-w-0 gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900 sm:grid-cols-2">
+          <input required value={newProduct.name} onChange={(event) => setNewProduct((current) => ({ ...current, name: event.target.value }))} placeholder="Nombre del plato" className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-950 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <input required value={newProduct.category} onChange={(event) => setNewProduct((current) => ({ ...current, category: event.target.value }))} list="menu-categories" placeholder="Categoría" className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-950 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
           <datalist id="menu-categories">{categories.filter((item) => item !== 'Todas').map((item) => <option key={item} value={item} />)}</datalist>
-          <input required min="0.01" step="0.01" type="number" value={newProduct.price} onChange={(event) => setNewProduct((current) => ({ ...current, price: event.target.value }))} placeholder="Precio S/" className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
-          <div className="flex gap-2"><button disabled={savingProduct} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{savingProduct ? 'Guardando…' : 'Guardar'}</button><button type="button" onClick={() => setShowProductForm(false)} className="rounded-xl border border-slate-200 p-3 text-slate-500 dark:border-slate-700"><X className="h-5 w-5" /></button></div>
+          <input required min="0.01" step="0.01" type="number" value={newProduct.price} onChange={(event) => setNewProduct((current) => ({ ...current, price: event.target.value }))} placeholder="Precio S/" className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-950 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <div className="flex min-w-0 gap-2"><button disabled={savingProduct} className="min-w-0 flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{savingProduct ? 'Guardando…' : 'Guardar plato'}</button><button type="button" onClick={() => setShowProductForm(false)} className="shrink-0 rounded-xl border border-slate-200 p-3 text-slate-500 dark:border-slate-700"><X className="h-5 w-5" /></button></div>
         </form>}
         {loading && <p className="py-10 text-center text-sm text-slate-400">Cargando productos...</p>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
