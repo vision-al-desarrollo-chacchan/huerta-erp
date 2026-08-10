@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import("../pages/Dashboard"));
 const Ventas = lazy(() => import("../pages/Ventas"));
 const Pedidos = lazy(() => import("../pages/Pedidos"));
 const Facturacion = lazy(() => import("../pages/Facturacion"));
+const Impresion = lazy(() => import("../pages/Impresion"));
 const Cotizaciones = lazy(() => import("../pages/Cotizaciones"));
 const Cocina = lazy(() => import("../pages/Cocina"));
 const Compras = lazy(() => import("../pages/Compras"));
@@ -48,6 +49,7 @@ export default function AppRoutes() {
           <Route path="/ventas/pos" element={<Ventas />} />
           <Route path="/ventas/pedidos" element={<Pedidos />} />
           <Route path="/ventas/facturacion" element={<Facturacion />} />
+          <Route path="/impresion" element={<Impresion />} />
           <Route path="/ventas/cotizaciones" element={<Cotizaciones />} />
 
           <Route path="/cocina" element={<Cocina />} />

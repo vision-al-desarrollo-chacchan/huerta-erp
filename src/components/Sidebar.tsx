@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Truck, Wallet, Calculator,
   UserCheck, Factory, Wrench, Rocket, Calendar, Folder, FileText, Bot,
-  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight, X,
+  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight, X, Printer,
 } from 'lucide-react';
 import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
 import { canOperatorAccess } from '../services/operator-permissions';
@@ -62,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
       <div className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Gestión y Operaciones</div>
       {allowed('/clientes') && <NavLink to="/clientes" className={link}><Users className="h-5 w-5" /> Clientes (CRM)</NavLink>}
       {allowed('/cocina') && <NavLink to="/cocina" className={link}><ChefHat className="h-5 w-5" /> Cocina & Comandas</NavLink>}
+      {allowed('/impresion') && <NavLink to="/impresion" className={link}><Printer className="h-5 w-5" /> Impresión 80 mm</NavLink>}
       {allowed('/compras') && <NavLink to="/compras" className={link}><Truck className="h-5 w-5" /> Compras & Prov.</NavLink>}
       {allowed('/caja') && <NavLink to="/caja" className={link}><Wallet className="h-5 w-5" /> Caja & Bancos</NavLink>}
       {allowed('/contabilidad') && <NavLink to="/contabilidad" className={link}><Calculator className="h-5 w-5" /> Contabilidad</NavLink>}
