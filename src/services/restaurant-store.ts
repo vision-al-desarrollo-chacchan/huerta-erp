@@ -5,7 +5,6 @@ import type { CashMovement, CashSession, OrderItem, OrderStatus, RestaurantOrder
 type BusinessContext = { empresaId: string; sucursalId: string };
 let cachedContext: BusinessContext | null = null;
 let cachedCash: CashSession | null | undefined;
-let cachedProducts: RestaurantProduct[] | null = null;
 
 async function context(): Promise<BusinessContext> {
   if (cachedContext) return cachedContext;
@@ -31,12 +30,10 @@ export async function getCurrentStaffName() {
 }
 
 export async function getProducts(): Promise<RestaurantProduct[]> {
-  if (cachedProducts) return cachedProducts;
   const { empresaId } = await context();
   const { data, error } = await supabase.from('rest_productos').select('id,nombre,categoria,precio,stock,activo').eq('empresa_id', empresaId).eq('activo', true).order('categoria').order('nombre');
   if (error) throw error;
-  cachedProducts = (data ?? []).map((row) => ({ id: row.id, name: row.nombre, category: row.categoria, price: Number(row.precio), stock: Number(row.stock), active: row.activo }));
-  return cachedProducts;
+  return (data ?? []).map((row) => ({ id: row.id, name: row.nombre, category: row.categoria, price: Number(row.precio), stock: Number(row.stock), active: row.activo }));
 }
 
 export async function createProduct(input: { name: string; category: string; price: number }) {
@@ -64,7 +61,6 @@ export async function createProduct(input: { name: string; category: string; pri
     .single();
   if (error) throw error;
   const product = { id: data.id, name: data.nombre, category: data.categoria, price: Number(data.precio), stock: Number(data.stock), active: data.activo } satisfies RestaurantProduct;
-  cachedProducts = cachedProducts ? [...cachedProducts, product] : null;
   return product;
 }
 
@@ -175,6 +171,7 @@ export async function subscribeRestaurantData(listener: () => void, onStatus?: (
   const channel = supabase.channel(`rest-operacion-${empresaId}-${sucursalId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedido_items' }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_productos' }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, () => { cachedCash = undefined; refresh(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_movimientos_caja', filter: `empresa_id=eq.${empresaId}` }, refresh)
     .subscribe((status) => {

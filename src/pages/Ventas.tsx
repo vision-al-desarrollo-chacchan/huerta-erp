@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
-import { createOrder, createProduct, getCashSession, getProducts } from '../services/restaurant-store';
+import { createOrder, createProduct, getCashSession, getProducts, subscribeRestaurantData } from '../services/restaurant-store';
 import type { OrderItem, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { useNotification } from '../context/notification-context';
 import { userErrorMessage } from '../lib/errors';
@@ -23,7 +23,19 @@ export default function Ventas() {
   const { notify } = useNotification();
 
   useEffect(() => {
-    getProducts().then(setProducts).catch((reason: unknown) => { const message = userErrorMessage(reason, 'No se pudieron cargar los productos.'); setNotice(message); notify(message, 'error'); }).finally(() => setLoading(false));
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    const loadProducts = () => {
+      getProducts()
+        .then((rows) => { if (active) setProducts(rows); })
+        .catch((reason: unknown) => { if (active) { const message = userErrorMessage(reason, 'No se pudieron cargar los productos.'); setNotice(message); notify(message, 'error'); } })
+        .finally(() => { if (active) setLoading(false); });
+    };
+    loadProducts();
+    void subscribeRestaurantData(loadProducts)
+      .then((cleanup) => { unsubscribe = cleanup; })
+      .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudo activar la actualización del catálogo.'), 'error'); });
+    return () => { active = false; unsubscribe?.(); };
   }, [notify]);
 
   const categories = ['Todas', ...Array.from(new Set(products.map((item) => item.category)))];
@@ -42,6 +54,7 @@ export default function Ventas() {
       if (found) return current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item);
       return [...current, { productId, name: product.name, quantity: 1, unitPrice: product.price }];
     });
+    setNotice(`${product.name} agregado al pedido.`);
   }
 
   function changeQuantity(productId: string, delta: number) {
@@ -97,14 +110,14 @@ export default function Ventas() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-slate-100 dark:bg-slate-950 lg:flex-row">
-      <section className="flex-1 p-4 lg:p-6">
-        <div className="mb-4 flex flex-col gap-3 xl:flex-row">
+    <div className="flex min-h-[calc(100vh-4rem)] min-w-0 flex-col overflow-x-hidden bg-slate-100 dark:bg-slate-950 lg:flex-row">
+      <section className="min-w-0 flex-1 p-4 lg:p-6">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 xl:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar plato o bebida..." className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
           </div>
-          <div className="flex gap-2 overflow-x-auto">
+          <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
             {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${category === item ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item}</button>)}
           </div>
           <button onClick={() => setShowProductForm(true)} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-5 w-5" />Agregar plato</button>
@@ -128,7 +141,7 @@ export default function Ventas() {
         </div>
       </section>
 
-      <aside className="flex w-full flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:w-[390px]">
+      <aside className="flex w-full shrink-0 flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:w-[390px]">
         <div className="border-b border-slate-200 p-5 dark:border-slate-800">
           <div className="mb-4 flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-blue-600" /><h2 className="font-bold text-slate-900 dark:text-white">Nuevo pedido</h2></div>
           <div className="grid grid-cols-3 gap-2">{(['salon', 'delivery', 'recojo'] as ServiceType[]).map((type) => <button key={type} onClick={() => setServiceType(type)} className={`rounded-lg py-2 text-xs font-bold capitalize ${serviceType === type ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>{type}</button>)}</div>
