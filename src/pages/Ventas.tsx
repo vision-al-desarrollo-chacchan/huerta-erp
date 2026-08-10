@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
-import { createOrder, createProduct, getCashSession, getOrders, getProducts, subscribeRestaurantData } from '../services/restaurant-store';
+import { createOrder, createProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData } from '../services/restaurant-store';
 import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
@@ -26,26 +26,36 @@ export default function Ventas() {
 
   useEffect(() => {
     let active = true;
-    let unsubscribe: (() => void) | undefined;
-    const load = () => {
-      Promise.all([getProducts(), getOrders()])
-        .then(([productRows, orderRows]) => { if (active) { setProducts(productRows); setOrders(orderRows); } })
-        .catch((reason: unknown) => { if (active) { const message = userErrorMessage(reason, 'No se pudieron cargar los productos.'); setNotice(message); notify(message, 'error'); } })
-        .finally(() => { if (active) setLoading(false); });
-    };
-    load();
-    void subscribeRestaurantData(load)
-      .then((cleanup) => { unsubscribe = cleanup; })
+    let unsubscribeProducts: (() => void) | undefined;
+    let unsubscribeOrders: (() => void) | undefined;
+    const loadProducts = () => getProducts()
+      .then((rows) => { if (active) setProducts(rows); })
+      .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudieron actualizar los productos.'), 'error'); });
+    const loadOrders = () => getOrders()
+      .then((rows) => { if (active) setOrders(rows); })
+      .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudieron actualizar las mesas.'), 'error'); });
+    Promise.all([getProducts(), getOrders()])
+      .then(([productRows, orderRows]) => { if (active) { setProducts(productRows); setOrders(orderRows); } })
+      .catch((reason: unknown) => { if (active) { const message = userErrorMessage(reason, 'No se pudo cargar el POS.'); setNotice(message); notify(message, 'error'); } })
+      .finally(() => { if (active) setLoading(false); });
+    void subscribeProducts(loadProducts)
+      .then((cleanup) => { unsubscribeProducts = cleanup; })
       .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudo activar la actualización del catálogo.'), 'error'); });
-    return () => { active = false; unsubscribe?.(); };
+    void subscribeRestaurantData(loadOrders)
+      .then((cleanup) => { unsubscribeOrders = cleanup; })
+      .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudo activar la actualización de mesas.'), 'error'); });
+    return () => { active = false; unsubscribeProducts?.(); unsubscribeOrders?.(); };
   }, [notify]);
 
-  const categories = ['Todas', ...Array.from(new Set(products.map((item) => item.category)))];
-  const filtered = products.filter((product) => {
-    const matchesCategory = category === 'Todas' || product.category === category;
-    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-    return product.active && matchesCategory && matchesSearch;
-  });
+  const categories = useMemo(() => ['Todas', ...Array.from(new Set(products.map((item) => item.category)))], [products]);
+  const filtered = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase('es-PE');
+    return products.filter((product) => {
+      const matchesCategory = category === 'Todas' || product.category === category;
+      const matchesSearch = !normalizedSearch || product.name.toLocaleLowerCase('es-PE').includes(normalizedSearch);
+      return product.active && matchesCategory && matchesSearch;
+    });
+  }, [products, category, search]);
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0), [cart]);
   const occupiedTables = useMemo(() => new Set(orders
     .filter((order) => order.serviceType === 'salon' && !['pagado', 'anulado'].includes(order.status) && order.table)
