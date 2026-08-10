@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
-import { createOrder, getCashSession, getProducts } from '../services/restaurant-store';
+import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
+import { createOrder, createProduct, getCashSession, getProducts } from '../services/restaurant-store';
 import type { OrderItem, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { useNotification } from '../context/notification-context';
 import { userErrorMessage } from '../lib/errors';
@@ -17,6 +17,9 @@ export default function Ventas() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: '', category: '', price: '' });
+  const [savingProduct, setSavingProduct] = useState(false);
   const { notify } = useNotification();
 
   useEffect(() => {
@@ -45,6 +48,23 @@ export default function Ventas() {
     setCart((current) => current
       .map((item) => item.productId === productId ? { ...item, quantity: item.quantity + delta } : item)
       .filter((item) => item.quantity > 0));
+  }
+
+  async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (savingProduct) return;
+    setSavingProduct(true);
+    try {
+      const product = await createProduct({ name: newProduct.name, category: newProduct.category, price: Number(newProduct.price) });
+      setProducts((current) => [...current, product]);
+      setNewProduct({ name: '', category: '', price: '' });
+      setShowProductForm(false);
+      notify(`${product.name} fue agregado al menú.`, 'success');
+    } catch (reason) {
+      notify(userErrorMessage(reason, 'No se pudo agregar el plato.'), 'error');
+    } finally {
+      setSavingProduct(false);
+    }
   }
 
   async function sendOrder() {
@@ -87,7 +107,15 @@ export default function Ventas() {
           <div className="flex gap-2 overflow-x-auto">
             {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${category === item ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item}</button>)}
           </div>
+          <button onClick={() => setShowProductForm(true)} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-5 w-5" />Agregar plato</button>
         </div>
+        {showProductForm && <form onSubmit={saveProduct} className="mb-4 grid gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900 md:grid-cols-[1fr_1fr_160px_auto]">
+          <input required value={newProduct.name} onChange={(event) => setNewProduct((current) => ({ ...current, name: event.target.value }))} placeholder="Nombre del plato" className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <input required value={newProduct.category} onChange={(event) => setNewProduct((current) => ({ ...current, category: event.target.value }))} list="menu-categories" placeholder="Categoría" className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <datalist id="menu-categories">{categories.filter((item) => item !== 'Todas').map((item) => <option key={item} value={item} />)}</datalist>
+          <input required min="0.01" step="0.01" type="number" value={newProduct.price} onChange={(event) => setNewProduct((current) => ({ ...current, price: event.target.value }))} placeholder="Precio S/" className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <div className="flex gap-2"><button disabled={savingProduct} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{savingProduct ? 'Guardando…' : 'Guardar'}</button><button type="button" onClick={() => setShowProductForm(false)} className="rounded-xl border border-slate-200 p-3 text-slate-500 dark:border-slate-700"><X className="h-5 w-5" /></button></div>
+        </form>}
         {loading && <p className="py-10 text-center text-sm text-slate-400">Cargando productos...</p>}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product) => (
