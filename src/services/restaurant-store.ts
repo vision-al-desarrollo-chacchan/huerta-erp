@@ -39,6 +39,35 @@ export async function getProducts(): Promise<RestaurantProduct[]> {
   return cachedProducts;
 }
 
+export async function createProduct(input: { name: string; category: string; price: number }) {
+  const name = input.name.trim();
+  const category = input.category.trim();
+  if (!name || !category) throw new Error('Completa el nombre y la categoría del plato.');
+  if (!Number.isFinite(input.price) || input.price <= 0) throw new Error('Ingresa un precio mayor a cero.');
+
+  const { empresaId } = await context();
+  const { data: duplicate, error: duplicateError } = await supabase
+    .from('rest_productos')
+    .select('id')
+    .eq('empresa_id', empresaId)
+    .ilike('nombre', name)
+    .ilike('categoria', category)
+    .limit(1)
+    .maybeSingle();
+  if (duplicateError) throw duplicateError;
+  if (duplicate) throw new Error('Ya existe un plato con ese nombre.');
+
+  const { data, error } = await supabase
+    .from('rest_productos')
+    .insert({ empresa_id: empresaId, nombre: name, categoria: category, precio: input.price, stock: 0, activo: true })
+    .select('id,nombre,categoria,precio,stock,activo')
+    .single();
+  if (error) throw error;
+  const product = { id: data.id, name: data.nombre, category: data.categoria, price: Number(data.precio), stock: Number(data.stock), active: data.activo } satisfies RestaurantProduct;
+  cachedProducts = cachedProducts ? [...cachedProducts, product] : null;
+  return product;
+}
+
 type OrderRow = {
   id: string; caja_id: string | null; numero: number; tipo_servicio: ServiceType; mesa: string | null; cliente: string | null;
   estado: OrderStatus; metodo_pago: string | null; created_at: string; updated_at: string;
