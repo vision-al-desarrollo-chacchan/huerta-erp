@@ -7,6 +7,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import OperatorRoute from "./OperatorRoute";
 
 const Login = lazy(() => import("../pages/Login"));
+const Demo = lazy(() => import("../pages/Demo"));
 const Dashboard = lazy(() => import("../pages/Dashboard"));
 const Ventas = lazy(() => import("../pages/Ventas"));
 const Pedidos = lazy(() => import("../pages/Pedidos"));
@@ -37,6 +38,7 @@ export default function AppRoutes() {
         <Route element={<GuestRoute />}>
           <Route path="/" element={<Login />} />
         </Route>
+        <Route path="/demo" element={<Demo />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<OperatorRoute><DashboardLayout /></OperatorRoute>}>
