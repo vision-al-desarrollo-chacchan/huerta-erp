@@ -161,7 +161,7 @@ export default function Ventas() {
       </section>
 
       <aside className="flex w-full shrink-0 flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-16 lg:h-[calc(100dvh-4rem)] lg:max-h-[calc(100dvh-4rem)] lg:w-[390px] lg:self-start lg:overflow-hidden">
-        <div className="border-b border-slate-200 p-5 dark:border-slate-800">
+        <div className="shrink-0 border-b border-slate-200 p-5 dark:border-slate-800 lg:max-h-[46%] lg:overflow-y-auto">
           <div className="mb-4 flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-blue-600" /><h2 className="font-bold text-slate-900 dark:text-white">Nuevo pedido</h2></div>
           <div className="grid grid-cols-3 gap-2">{(['salon', 'delivery', 'recojo'] as ServiceType[]).map((type) => <button key={type} onClick={() => setServiceType(type)} className={`rounded-lg py-2 text-xs font-bold capitalize ${serviceType === type ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>{type}</button>)}</div>
           {serviceType === 'salon' && <div className="mt-4">
@@ -178,14 +178,20 @@ export default function Ventas() {
             </div>
           </div>}
         </div>
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
-          {!cart.length && <div className="py-14 text-center text-sm text-slate-400">Selecciona productos para comenzar.</div>}
-          {cart.map((item) => (
-            <div key={item.productId} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-              <div className="flex justify-between gap-3"><p className="text-sm font-semibold text-slate-800 dark:text-white">{item.name}</p><strong className="text-sm dark:text-white">{money.format(item.unitPrice * item.quantity)}</strong></div>
-              <div className="mt-3 flex items-center justify-between"><div className="flex items-center gap-2"><button onClick={() => changeQuantity(item.productId, -1)} className="rounded-md bg-slate-100 p-1 dark:bg-slate-800"><Minus className="h-4 w-4" /></button><span className="w-6 text-center text-sm font-bold dark:text-white">{item.quantity}</span><button onClick={() => changeQuantity(item.productId, 1)} className="rounded-md bg-slate-100 p-1 dark:bg-slate-800"><Plus className="h-4 w-4" /></button></div><button onClick={() => setCart((current) => current.filter((row) => row.productId !== item.productId))} className="text-red-500"><Trash2 className="h-4 w-4" /></button></div>
-            </div>
-          ))}
+        <div className="flex min-h-32 flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <strong className="text-sm text-slate-800 dark:text-white">Detalle del pedido</strong>
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">{cart.reduce((sum, item) => sum + item.quantity, 0)} productos</span>
+          </div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+            {!cart.length && <div className="py-8 text-center text-sm text-slate-400">Selecciona productos para comenzar.</div>}
+            {cart.map((item) => (
+              <div key={item.productId} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <div className="flex justify-between gap-3"><p className="text-sm font-semibold text-slate-800 dark:text-white">{item.name}</p><strong className="text-sm dark:text-white">{money.format(item.unitPrice * item.quantity)}</strong></div>
+                <div className="mt-3 flex items-center justify-between"><div className="flex items-center gap-2"><button onClick={() => changeQuantity(item.productId, -1)} className="rounded-md bg-slate-100 p-1 dark:bg-slate-800"><Minus className="h-4 w-4" /></button><span className="w-6 text-center text-sm font-bold dark:text-white">{item.quantity}</span><button onClick={() => changeQuantity(item.productId, 1)} className="rounded-md bg-slate-100 p-1 dark:bg-slate-800"><Plus className="h-4 w-4" /></button></div><button onClick={() => setCart((current) => current.filter((row) => row.productId !== item.productId))} className="text-red-500"><Trash2 className="h-4 w-4" /></button></div>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="sticky bottom-0 z-10 shrink-0 border-t border-slate-200 bg-white p-5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-900">
           {notice && <p className={`mb-3 rounded-lg p-3 text-xs font-semibold ${notice.includes('correctamente') ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{notice}</p>}
