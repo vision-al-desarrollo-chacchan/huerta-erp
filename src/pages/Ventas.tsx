@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
 import { createOrder, getCashSession, getProducts } from '../services/restaurant-store';
 import type { OrderItem, RestaurantProduct, ServiceType } from '../types/restaurant';
+import { useNotification } from '../context/notification-context';
+import { userErrorMessage } from '../lib/errors';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
@@ -15,10 +17,11 @@ export default function Ventas() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const { notify } = useNotification();
 
   useEffect(() => {
-    getProducts().then(setProducts).catch((error: Error) => setNotice(error.message)).finally(() => setLoading(false));
-  }, []);
+    getProducts().then(setProducts).catch((reason: unknown) => { const message = userErrorMessage(reason, 'No se pudieron cargar los productos.'); setNotice(message); notify(message, 'error'); }).finally(() => setLoading(false));
+  }, [notify]);
 
   const categories = ['Todas', ...Array.from(new Set(products.map((item) => item.category)))];
   const filtered = products.filter((product) => {
@@ -63,8 +66,11 @@ export default function Ventas() {
       const order = await createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
       setCart([]);
       setNotice(`Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'No se pudo registrar el pedido.');
+      notify(`Pedido #${String(order.number).padStart(3, '0')} enviado a cocina.`, 'success');
+    } catch (reason) {
+      const message = userErrorMessage(reason, 'No se pudo registrar el pedido.');
+      setNotice(message);
+      notify(message, 'error');
     } finally {
       setSending(false);
     }

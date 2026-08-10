@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChefHat, Clock3 } from 'lucide-react';
 import { getOrders, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
 import type { OrderStatus, RestaurantOrder } from '../types/restaurant';
+import { useNotification } from '../context/notification-context';
+import { userErrorMessage } from '../lib/errors';
 
 const columns: { status: OrderStatus; title: string; action: string; next?: OrderStatus }[] = [
   { status: 'nuevo', title: 'Nuevos', action: 'Comenzar', next: 'preparando' },
@@ -13,13 +15,26 @@ export default function Cocina() {
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [error, setError] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const { notify } = useNotification();
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    const load = () => getOrders().then(setOrders).catch((reason: Error) => setError(reason.message));
+    let active = true;
+    const load = () => getOrders().then((data) => { if (active) { setOrders(data); setError(''); } }).catch((reason: unknown) => {
+      const message = userErrorMessage(reason, 'No se pudieron cargar las comandas.');
+      if (active) { setError(message); notify(message, 'error'); }
+    });
     void load();
-    void subscribeRestaurantData(load).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: Error) => setError(reason.message));
-    return () => unsubscribe?.();
-  }, []);
+    void subscribeRestaurantData(load, (status) => {
+      if (!active) return;
+      setRealtimeConnected(status === 'connected');
+      if (status === 'error') notify('Se perdió la actualización en tiempo real. Intentando reconectar…', 'error');
+    }).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: unknown) => {
+      const message = userErrorMessage(reason, 'No se pudo iniciar la actualización en tiempo real.');
+      setError(message); notify(message, 'error');
+    });
+    return () => { active = false; unsubscribe?.(); };
+  }, [notify]);
   const activeOrders = useMemo(() => orders.filter((order) => ['nuevo', 'preparando', 'listo'].includes(order.status)), [orders]);
 
   async function advance(order: RestaurantOrder, status: OrderStatus) {
@@ -30,7 +45,9 @@ export default function Cocina() {
       await updateOrderStatus(order.id, status);
     } catch (reason) {
       setOrders((current) => current.map((item) => item.id === order.id ? order : item));
-      setError(reason instanceof Error ? reason.message : 'No se pudo actualizar el pedido.');
+      const message = userErrorMessage(reason, 'No se pudo actualizar el pedido.');
+      setError(message);
+      notify(message, 'error');
     } finally {
       setSavingId(null);
     }
@@ -38,7 +55,7 @@ export default function Cocina() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 dark:bg-slate-950 lg:p-6">
-      <div className="mb-6 flex items-center gap-3"><div className="rounded-xl bg-orange-500 p-3 text-white"><ChefHat /></div><div><h1 className="text-2xl font-black text-slate-900 dark:text-white">Pantalla de cocina</h1><p className="text-sm text-slate-500">Pedidos actualizados en tiempo real en este dispositivo</p></div></div>
+      <div className="mb-6 flex items-center gap-3"><div className="rounded-xl bg-orange-500 p-3 text-white"><ChefHat /></div><div><h1 className="text-2xl font-black text-slate-900 dark:text-white">Pantalla de cocina</h1><p className="text-sm text-slate-500">Pedidos actualizados en tiempo real en este dispositivo</p><span className={`mt-1 inline-flex items-center gap-1.5 text-xs font-bold ${realtimeConnected ? 'text-emerald-600' : 'text-amber-600'}`}><span className={`h-2 w-2 rounded-full ${realtimeConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />{realtimeConnected ? 'En tiempo real' : 'Conectando…'}</span></div></div>
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
       <div className="grid gap-4 xl:grid-cols-3">
         {columns.map((column) => (
