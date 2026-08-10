@@ -22,6 +22,7 @@ export default function Ventas() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', category: '', price: '' });
   const [savingProduct, setSavingProduct] = useState(false);
+  const [showMobileOrder, setShowMobileOrder] = useState(false);
   const { notify } = useNotification();
 
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function Ventas() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] min-w-0 flex-col overflow-x-hidden bg-slate-100 dark:bg-slate-950 lg:flex-row">
+    <div className="flex min-h-[calc(100vh-4rem)] min-w-0 flex-col overflow-x-hidden bg-slate-100 pb-24 dark:bg-slate-950 lg:flex-row lg:pb-0">
       <section className="min-w-0 flex-1 p-4 lg:p-6">
         <div className="mb-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="relative min-w-0">
@@ -160,9 +161,10 @@ export default function Ventas() {
         </div>
       </section>
 
-      <aside className="flex w-full shrink-0 flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-16 lg:h-[calc(100dvh-4rem)] lg:max-h-[calc(100dvh-4rem)] lg:w-[390px] lg:self-start lg:overflow-hidden">
-        <div className="shrink-0 border-b border-slate-200 p-5 dark:border-slate-800 lg:max-h-[46%] lg:overflow-y-auto">
-          <div className="mb-4 flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-blue-600" /><h2 className="font-bold text-slate-900 dark:text-white">Nuevo pedido</h2></div>
+      {showMobileOrder && <button type="button" aria-label="Cerrar pedido" onClick={() => setShowMobileOrder(false)} className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden" />}
+      <aside className={`${showMobileOrder ? 'fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] rounded-t-3xl shadow-2xl' : 'hidden'} w-full shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-16 lg:flex lg:h-[calc(100dvh-4rem)] lg:max-h-[calc(100dvh-4rem)] lg:w-[390px] lg:self-start lg:rounded-none lg:shadow-none`}>
+        <div className="order-1 max-h-[42dvh] shrink-0 overflow-y-auto border-b border-slate-200 p-5 dark:border-slate-800 lg:max-h-[46%]">
+          <div className="mb-4 flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-blue-600" /><h2 className="flex-1 font-bold text-slate-900 dark:text-white">Nuevo pedido</h2><button type="button" onClick={() => setShowMobileOrder(false)} className="rounded-lg p-2 text-slate-500 lg:hidden" aria-label="Cerrar"><X className="h-5 w-5" /></button></div>
           <div className="grid grid-cols-3 gap-2">{(['salon', 'delivery', 'recojo'] as ServiceType[]).map((type) => <button key={type} onClick={() => setServiceType(type)} className={`rounded-lg py-2 text-xs font-bold capitalize ${serviceType === type ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>{type}</button>)}</div>
           {serviceType === 'salon' && <div className="mt-4">
             <div className="mb-2 flex items-center justify-between"><strong className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">Selecciona una mesa</strong><span className="text-[10px] font-bold text-slate-400">Verde libre · Rojo ocupada</span></div>
@@ -178,7 +180,7 @@ export default function Ventas() {
             </div>
           </div>}
         </div>
-        <div className="flex min-h-32 flex-1 flex-col overflow-hidden">
+        <div className="order-3 flex min-h-32 flex-1 flex-col overflow-hidden lg:order-2">
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
             <strong className="text-sm text-slate-800 dark:text-white">Detalle del pedido</strong>
             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">{cart.reduce((sum, item) => sum + item.quantity, 0)} productos</span>
@@ -193,12 +195,21 @@ export default function Ventas() {
             ))}
           </div>
         </div>
-        <div className="sticky bottom-0 z-10 shrink-0 border-t border-slate-200 bg-white p-5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-900">
+        <div className="order-2 shrink-0 border-t border-slate-200 bg-white p-5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-900 lg:order-3 lg:sticky lg:bottom-0 lg:z-10">
           {notice && <p className={`mb-3 rounded-lg p-3 text-xs font-semibold ${notice.includes('correctamente') ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{notice}</p>}
           <div className="mb-4 flex items-end justify-between"><span className="text-sm font-semibold text-slate-500">Total</span><strong className="text-3xl text-slate-900 dark:text-white">{money.format(total)}</strong></div>
           <button disabled={sending} onClick={sendOrder} className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : 'Enviar a cocina'}</button>
         </div>
       </aside>
+      {!showMobileOrder && <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.14)] dark:border-slate-800 dark:bg-slate-900 lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <button type="button" onClick={() => setShowMobileOrder(true)} className="min-w-0 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-left dark:bg-slate-800">
+            <span className="block text-xs font-bold text-slate-500">Ver pedido · {cart.reduce((sum, item) => sum + item.quantity, 0)} productos</span>
+            <strong className="text-xl text-slate-950 dark:text-white">{money.format(total)}</strong>
+          </button>
+          <button type="button" onClick={() => setShowMobileOrder(true)} className="rounded-xl bg-blue-600 px-5 py-4 font-black text-white">Continuar</button>
+        </div>
+      </div>}
     </div>
   );
 }
