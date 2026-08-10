@@ -161,6 +161,25 @@ export async function registerCashMovement(input: { type: 'ingreso' | 'egreso'; 
 
 export type RealtimeStatus = 'connected' | 'disconnected' | 'error';
 
+export async function subscribeProducts(listener: () => void, onStatus?: (status: RealtimeStatus) => void) {
+  const { empresaId } = await context();
+  let refreshTimer: number | undefined;
+  const refresh = () => {
+    window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(listener, 120);
+  };
+  const channel = supabase.channel(`rest-productos-${empresaId}`)
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') onStatus?.('connected');
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onStatus?.('error');
+      else if (status === 'CLOSED') onStatus?.('disconnected');
+    });
+  return () => {
+    window.clearTimeout(refreshTimer);
+    void supabase.removeChannel(channel);
+  };
+}
+
 export async function subscribeRestaurantData(listener: () => void, onStatus?: (status: RealtimeStatus) => void) {
   const { empresaId, sucursalId } = await context();
   let refreshTimer: number | undefined;
