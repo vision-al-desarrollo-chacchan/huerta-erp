@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useCallback,
   useMemo,
   useState,
   type ReactElement,
@@ -9,6 +10,8 @@ import {
   AlertTriangle,
   ArrowDownUp,
   BookOpen,
+  ClipboardList,
+  Download,
   Package,
   Plus,
   Trash2,
@@ -17,12 +20,14 @@ import { getProducts } from "../services/restaurant-store";
 import {
   deleteRecipeLine,
   getInventoryMovements,
+  getDailyInventorySummary,
   getRecipeLines,
   getSupplies,
   registerInventoryMovement,
   saveRecipeLine,
   saveSupply,
   type InventoryMovement,
+  type DailyInventorySummary,
   type RecipeLine,
   type Supply,
 } from "../services/inventory-store";
@@ -38,11 +43,13 @@ const emptySupply = {
 };
 const msg = (e: unknown, f: string) => (e instanceof Error ? e.message : f);
 export default function Inventario() {
-  const [tab, setTab] = useState<"insumos" | "kardex" | "recetas">("insumos");
+  const [tab, setTab] = useState<"resumen" | "insumos" | "kardex" | "recetas">("resumen");
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [recipes, setRecipes] = useState<RecipeLine[]>([]);
   const [products, setProducts] = useState<RestaurantProduct[]>([]);
+  const [summary, setSummary] = useState<DailyInventorySummary[]>([]);
+  const [summaryDate, setSummaryDate] = useState(() => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima'}).format(new Date()));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [supply, setSupply] = useState(emptySupply);
@@ -58,31 +65,39 @@ export default function Inventario() {
     quantity: 0,
     useUnit: "",
   });
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setError("");
-      const [a, b, c, d] = await Promise.all([
+      const [a, b, c, d, e] = await Promise.all([
         getSupplies(),
         getInventoryMovements(),
         getRecipeLines(),
         getProducts(),
+        getDailyInventorySummary(summaryDate),
       ]);
       setSupplies(a);
       setMovements(b);
       setRecipes(c);
       setProducts(d);
+      setSummary(e);
     } catch (e: unknown) {
       setError(msg(e, "No se pudo cargar."));
     }
-  };
+  }, [summaryDate]);
   useEffect(() => {
     const t = setTimeout(() => void load(), 0);
     return () => clearTimeout(t);
-  }, []);
+  }, [load]);
   const low = useMemo(
     () => supplies.filter((x) => x.stock <= x.minStock),
     [supplies],
   );
+  const shopping = useMemo(() => summary.filter(item => item.suggestedPurchase > 0), [summary]);
+  const downloadShoppingList = () => {
+    const lines = [['Insumo','Cantidad','Unidad'], ...shopping.map(item=>[item.name,String(item.suggestedPurchase),item.unit])];
+    const blob = new Blob([lines.map(row=>row.map(value=>`"${value.replaceAll('"','""')}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'});
+    const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=`compras-${summaryDate}.csv`; link.click(); URL.revokeObjectURL(link.href);
+  };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -128,6 +143,7 @@ export default function Inventario() {
       <div className="mb-5 flex gap-2 overflow-x-auto">
         {(
           [
+            ["resumen", "Resumen diario"],
             ["insumos", "Insumos"],
             ["kardex", "Kardex"],
             ["recetas", "Recetas"],
@@ -142,6 +158,14 @@ export default function Inventario() {
           </button>
         ))}
       </div>
+      {tab === "resumen" && <div className="space-y-5">
+        <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border bg-white p-5">
+          <div><h2 className="text-xl font-black">Lo que quedó y lo que debes comprar</h2><p className="text-sm text-slate-500">Las salidas por ventas se calculan automáticamente desde las recetas.</p></div>
+          <div className="flex flex-wrap gap-2"><label className="text-xs font-bold uppercase text-slate-500">Fecha<input type="date" className="mt-1 block rounded-xl border px-4 py-2 font-semibold text-slate-900" value={summaryDate} onChange={event=>setSummaryDate(event.target.value)}/></label><button disabled={!shopping.length} onClick={downloadShoppingList} className="self-end rounded-xl bg-emerald-600 px-4 py-2.5 font-black text-white disabled:opacity-40"><Download className="mr-2 inline h-4 w-4"/>Descargar lista</button><button onClick={()=>window.print()} className="self-end rounded-xl bg-slate-900 px-4 py-2.5 font-black text-white">Imprimir</button></div>
+        </section>
+        <section className="overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[1000px] text-sm"><thead className="bg-slate-50 text-left text-xs font-black uppercase text-slate-500"><tr><th className="p-4">Insumo</th><th>Stock inicial</th><th>Comprado</th><th>Consumido</th><th>Merma</th><th>Ajuste</th><th>Stock final</th><th>Compra sugerida</th></tr></thead><tbody className="divide-y">{summary.map(item=><tr key={item.supplyId}><td className="p-4"><b>{item.name}</b><small className="block text-slate-400">{item.code} · {item.category}</small></td><td>{item.openingStock} {item.unit}</td><td className="font-bold text-emerald-600">+{item.purchased}</td><td className="font-bold text-blue-600">-{item.consumed}</td><td className="font-bold text-red-600">-{item.waste}</td><td>{item.adjustment>0?'+':''}{item.adjustment}</td><td className="font-black">{item.closingStock} {item.unit}</td><td>{item.suggestedPurchase>0?<span className="rounded-full bg-amber-100 px-3 py-1 font-black text-amber-800">Comprar {item.suggestedPurchase} {item.unit}</span>:<span className="font-bold text-emerald-600">Suficiente</span>}</td></tr>)}</tbody></table><Empty show={!summary.length} text="No hay insumos registrados."/></section>
+        <section className="rounded-2xl border bg-white p-5"><h2 className="mb-4 flex items-center gap-2 text-lg font-black"><ClipboardList className="text-amber-600"/>Lista para comprar mañana</h2>{shopping.length===0?<p className="rounded-xl bg-emerald-50 p-5 font-bold text-emerald-700">No necesitas reponer insumos según el consumo y el stock mínimo.</p>:<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{shopping.map(item=><div key={item.supplyId} className="flex justify-between rounded-xl bg-amber-50 p-4"><b>{item.name}</b><strong>{item.suggestedPurchase} {item.unit}</strong></div>)}</div>}<p className="mt-4 text-xs text-slate-500">Sugerencia = consumo del día + stock mínimo − stock disponible. Puedes ajustar el stock mínimo de cada insumo.</p></section>
+      </div>}
       {tab === "insumos" && (
         <Grid>
           <Panel title="Nuevo insumo">
