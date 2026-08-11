@@ -22,6 +22,16 @@ export function canOperatorAccess(role: Role, path: string) {
   return permissions[role].some((allowed) => path === allowed || path.startsWith(`${allowed}/`));
 }
 
+export function canOperatorRolesAccess(roles: Role[], path: string) {
+  return roles.some((role) => canOperatorAccess(role, path));
+}
+
 export function operatorHome(role: Role) {
   return home[role];
+}
+
+export function operatorRolesHome(roles: Role[]) {
+  if (roles.includes('supervisor')) return home.supervisor;
+  if (roles.includes('moza_cajera') || roles.includes('cajero') || roles.includes('mozo')) return home.cajero;
+  return home[roles[0] ?? 'mozo'];
 }

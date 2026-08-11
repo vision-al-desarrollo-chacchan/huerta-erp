@@ -10,7 +10,9 @@ export type Task = { id: string; titulo: string; descripcion: string | null; fec
 export type QuoteItem = { producto_id: string | null; descripcion: string; cantidad: number; precio: number };
 export type Quote = { id: string; numero: number; cliente_id: string | null; cliente_nombre: string; estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada' | 'vencida'; total: number; vence_at: string | null; observaciones: string | null; created_at: string; erp_cotizacion_items: QuoteItem[] };
 export type AccountingEntry = { id: string; fecha: string; tipo: 'ingreso' | 'egreso'; categoria: string; descripcion: string; monto: number; metodo_pago: string | null; referencia: string | null; created_at: string };
-export type Member = { empresa_id: string; user_id: string; rol: 'propietario' | 'administrador' | 'cajero' | 'mozo' | 'cocina'; activo: boolean; nombre: string | null };
+export type MemberRole = 'propietario' | 'administrador' | 'cajero' | 'mozo' | 'moza_cajera' | 'cocina' | 'supervisor';
+export type Member = { empresa_id: string; user_id: string; rol: MemberRole; roles: MemberRole[]; activo: boolean; nombre: string | null; email: string | null };
+export type EmployeeActivity = { id: string; user_id: string; accion: string; detalle: Record<string, unknown>; created_at: string };
 export type Invitation = { id: string; email: string; rol: string; token: string; estado: 'pendiente' | 'usada' | 'revocada'; created_at: string };
 export type CompanySettings = { empresaId: string; branchId: string; nombre: string; nombreComercial: string; ruc: string; telefono: string; direccion: string; sucursal: string; sucursalDireccion: string; moneda: string; igv: number; serieBoleta: string; serieFactura: string };
 
@@ -75,8 +77,16 @@ export async function createAccountingEntry(values: Omit<AccountingEntry, 'id' |
   return insert<AccountingEntry>('erp_movimientos_contables', { ...values, registrado_por: data.user?.id });
 }
 
-export async function getMembers(): Promise<Member[]> { const empresaId=await companyId(); const {data,error}=await supabase.from('rest_miembros').select('empresa_id,user_id,rol,activo,nombre').eq('empresa_id',empresaId).order('nombre'); if(error)throw error; return (data??[]) as Member[]; }
+export async function getMembers(): Promise<Member[]> { const empresaId=await companyId(); const {data,error}=await supabase.from('rest_miembros').select('empresa_id,user_id,rol,roles,activo,nombre,email').eq('empresa_id',empresaId).order('nombre'); if(error)throw error; return (data??[]).map(row=>({...row,roles:row.roles?.length?row.roles:[row.rol]})) as Member[]; }
 export async function setMember(id:string,values:{rol?:Member['rol'];activo?:boolean}){const empresaId=await companyId();const {error}=await supabase.from('rest_miembros').update(values).eq('empresa_id',empresaId).eq('user_id',id);if(error)throw error;}
+export async function manageWorkerAccount(payload: { action: 'create'|'password'|'active'|'roles'; userId?: string; name?: string; email?: string; password?: string; roles?: MemberRole[]; active?: boolean }) {
+  const empresaId = await companyId();
+  const { data, error } = await supabase.functions.invoke('manage-worker', { body: { ...payload, empresaId } });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+export async function getEmployeeActivity(userId:string):Promise<EmployeeActivity[]> { const empresaId=await companyId(); const {data,error}=await supabase.from('erp_actividad_empleados').select('id,user_id,accion,detalle,created_at').eq('empresa_id',empresaId).eq('user_id',userId).order('created_at',{ascending:false}).limit(50); if(error)throw error; return(data??[]) as EmployeeActivity[]; }
 export async function getInvitations():Promise<Invitation[]>{const empresaId=await companyId();const {data,error}=await supabase.from('erp_invitaciones').select('id,email,rol,token,estado,created_at').eq('empresa_id',empresaId).order('created_at',{ascending:false});if(error)throw error;return(data??[]) as Invitation[];}
 export async function createInvitation(email:string,rol:string):Promise<Invitation>{const empresaId=await companyId();const {data,error}=await supabase.rpc('erp_crear_invitacion',{p_empresa_id:empresaId,p_email:email,p_rol:rol});if(error)throw error;return data as Invitation;}
 export async function acceptInvitation(token:string){const {data,error}=await supabase.rpc('erp_aceptar_invitacion',{p_token:token});if(error)throw error;return data as string;}

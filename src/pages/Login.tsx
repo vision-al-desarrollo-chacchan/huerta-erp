@@ -3,7 +3,7 @@ import logo from '../assets/logo-white.svg';
 import { useState } from 'react';
 import { Eye, EyeOff, LockKeyhole, Mail, TicketCheck, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { login, register } from '../services/auth';
+import { login, prepareLoggedInAccess, register } from '../services/auth';
 import { acceptInvitation } from '../services/erp-store';
 
 export default function Login() {
@@ -31,7 +31,7 @@ export default function Login() {
         return;
       }
     }
-    navigate('/dashboard');
+    try { navigate(await prepareLoggedInAccess()); } catch (reason) { setMessage(reason instanceof Error ? reason.message : 'No se pudo validar tu acceso.'); }
   }
 
   async function handleRegister() {
@@ -46,7 +46,7 @@ export default function Login() {
       try {
         await acceptInvitation(invite.trim());
         localStorage.removeItem('huerta-invite');
-        navigate('/dashboard');
+        navigate(await prepareLoggedInAccess());
       } catch (reason) {
         setMessage(reason instanceof Error ? reason.message : 'No se pudo aceptar la invitación.');
       }

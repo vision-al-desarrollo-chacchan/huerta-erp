@@ -2,6 +2,7 @@ export type ActiveOperator = {
   employeeId: string;
   name: string;
   role: 'cajero' | 'mozo' | 'moza_cajera' | 'cocina' | 'supervisor';
+  roles?: ActiveOperator['role'][];
 };
 
 const OPERATOR_KEY = 'huerta-active-operator';
