@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Banknote, CheckCircle, LockKeyhole, WalletCards } from 'lucide-react';
+import { Banknote, CheckCircle, LockKeyhole, Printer, WalletCards } from 'lucide-react';
 import { closeCash, getCashMovements, getCashSession, getCurrentStaffName, getOrders, openCash, orderTotal, registerCashMovement, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
 import type { CashMovement, CashSession, RestaurantOrder } from '../types/restaurant';
 
@@ -18,10 +18,10 @@ function errorMessage(reason: unknown, fallback: string) {
 export default function Caja() {
   const [session, setSession] = useState<CashSession | null>(null);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
-  const [amount, setAmount] = useState('100');
+  const [amount, setAmount] = useState('50');
   const [countedAmount, setCountedAmount] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
-  const [nextShiftFund, setNextShiftFund] = useState('100');
+  const [nextShiftFund, setNextShiftFund] = useState('50');
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export default function Caja() {
   const [movementConcept, setMovementConcept] = useState('');
   const [movementAmount, setMovementAmount] = useState('');
   const [closedReport, setClosedReport] = useState<{ session: CashSession; payments: Record<string, number>; movements: CashMovement[] } | null>(null);
+  const [saleReceipt, setSaleReceipt] = useState<{ order: RestaurantOrder; paymentMethod: string; chargedAt: string } | null>(null);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -66,6 +67,8 @@ export default function Caja() {
     setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: 'pagado', paymentMethod } : item));
     try {
       await updateOrderStatus(order.id, 'pagado', paymentMethod);
+      const paidOrder = { ...order, status: 'pagado' as const, paymentMethod };
+      setSaleReceipt({ order: paidOrder, paymentMethod, chargedAt: new Date().toISOString() });
     } catch (reason) {
       setOrders((current) => current.map((item) => item.id === order.id ? order : item));
       setError(reason instanceof Error ? reason.message : 'No se pudo cobrar el pedido.');
@@ -141,8 +144,22 @@ export default function Caja() {
               <button disabled={busyAction === 'close' || Number(nextShiftFund) < 0 || Number(nextShiftFund) > Number(displayedCountedAmount) || (Math.abs(closingDifference) >= 0.01 && !closingNotes.trim())} onClick={() => { if (confirm('¿Cerrar la caja actual?')) void finishCash(); }} className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-600">{busyAction === 'close' ? 'Cerrando…' : 'Cerrar caja'}</button>
             </aside>
           </div>
+          {paid.length > 0 && <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 font-bold text-slate-900 dark:text-white">Últimas ventas cobradas</h2><div className="space-y-2">{paid.slice(0,5).map((order) => <div key={order.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><div><b className="dark:text-white">Pedido #{String(order.number).padStart(3,'0')}</b><p className="text-xs text-slate-500">{order.paymentMethod} · {money.format(orderTotal(order))}</p></div><button onClick={() => setSaleReceipt({ order, paymentMethod: order.paymentMethod ?? 'Efectivo', chargedAt: order.updatedAt })} className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-black text-blue-700"><Printer className="h-4 w-4"/>Imprimir</button></div>)}</div></section>}
         </>
       )}
+      {saleReceipt && <>
+        <style>{`@media print { body * { visibility: hidden !important; } #sale-receipt, #sale-receipt * { visibility: visible !important; } #sale-receipt { position: absolute !important; left: 0; top: 0; width: 72mm !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; color: #000 !important; background: #fff !important; } .receipt-actions { display: none !important; } } @page { size: 80mm auto; margin: 4mm; }`}</style>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+          <div id="sale-receipt" className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 text-slate-950 shadow-2xl">
+            <div className="text-center"><h2 className="text-xl font-black">CHICKEN HUERTA</h2><p className="text-xs">TICKET DE VENTA</p><p className="mt-1 text-xs">Pedido #{String(saleReceipt.order.number).padStart(3,'0')}</p><p className="text-xs">{new Date(saleReceipt.chargedAt).toLocaleString('es-PE')}</p></div>
+            <div className="my-4 border-y border-dashed border-slate-400 py-3 text-xs"><p>Atendió: {staffName}</p><p>Servicio: {saleReceipt.order.table ?? saleReceipt.order.serviceType}</p>{saleReceipt.order.customer && <p>Cliente: {saleReceipt.order.customer}</p>}</div>
+            <div className="space-y-2">{saleReceipt.order.items.map((item,index) => <div key={`${item.productId}-${index}`} className="text-xs"><div className="flex justify-between gap-3"><span>{item.quantity} × {item.name}</span><b>{money.format(item.quantity*item.unitPrice)}</b></div>{item.notes && <p className="pl-3 text-[10px]">Nota: {item.notes}</p>}</div>)}</div>
+            <div className="my-4 border-y border-dashed border-slate-400 py-3"><ReceiptRow label="TOTAL" value={money.format(orderTotal(saleReceipt.order))} strong/><ReceiptRow label="Método de pago" value={saleReceipt.paymentMethod}/></div>
+            <p className="text-center text-xs">¡Gracias por su compra!</p>
+            <div className="receipt-actions mt-6 grid gap-2"><button onClick={() => window.print()} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white"><Printer className="h-5 w-5"/>Imprimir ticket / Guardar PDF</button><button onClick={() => setSaleReceipt(null)} className="rounded-xl bg-slate-100 py-3 font-bold text-slate-700">Cerrar</button></div>
+          </div>
+        </div>
+      </>}
       {closedReport && <>
         <style>{`@media print { body * { visibility: hidden !important; } #cash-close-receipt, #cash-close-receipt * { visibility: visible !important; } #cash-close-receipt { position: absolute !important; left: 0; top: 0; width: 72mm !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; color: #000 !important; background: #fff !important; } .receipt-actions { display: none !important; } } @page { size: 80mm auto; margin: 4mm; }`}</style>
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
