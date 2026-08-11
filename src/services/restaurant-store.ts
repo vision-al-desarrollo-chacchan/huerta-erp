@@ -96,6 +96,7 @@ export async function createOrder(order: { serviceType: ServiceType; table?: str
   const { data, error } = await supabase.rpc('rest_crear_pedido', {
     p_empresa_id: empresaId, p_sucursal_id: sucursalId, p_caja_id: cash.id,
     p_tipo_servicio: order.serviceType, p_mesa: order.table ?? '', p_cliente: order.customer ?? '', p_items: order.items,
+    p_idempotency_key: crypto.randomUUID(),
   });
   if (error) throw error;
   const created = Array.isArray(data) ? data[0] : data;
@@ -114,9 +115,11 @@ export async function createOrder(order: { serviceType: ServiceType; table?: str
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: string) {
-  const patch: { estado: OrderStatus; updated_at: string; metodo_pago?: string } = { estado: status, updated_at: new Date().toISOString() };
-  if (paymentMethod) patch.metodo_pago = paymentMethod;
-  const { error } = await supabase.from('rest_pedidos').update(patch).eq('id', id);
+  const { error } = await supabase.rpc('rest_actualizar_estado_pedido', {
+    p_pedido_id: id,
+    p_estado: status,
+    p_metodo_pago: paymentMethod ?? null,
+  });
   if (error) throw error;
 }
 
