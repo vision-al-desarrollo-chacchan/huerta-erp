@@ -41,6 +41,21 @@ export type InventoryPurchase = {
   provider: string;
   createdAt: string;
 };
+export type DailyInventorySummary = {
+  supplyId: string;
+  code: string;
+  name: string;
+  category: string;
+  unit: string;
+  openingStock: number;
+  purchased: number;
+  consumed: number;
+  waste: number;
+  adjustment: number;
+  closingStock: number;
+  minStock: number;
+  suggestedPurchase: number;
+};
 type MovementRow = {
   id: string;
   tipo: string;
@@ -223,6 +238,16 @@ export async function getInventoryMovements(): Promise<InventoryMovement[]> {
     reason: x.motivo,
     responsible: x.registrado_por_nombre ?? "Sistema",
     createdAt: x.created_at,
+  }));
+}
+export async function getDailyInventorySummary(date: string): Promise<DailyInventorySummary[]> {
+  const { empresaId } = await getBusinessContext();
+  const { data, error } = await supabase.rpc('rest_resumen_inventario_diario', { p_empresa_id: empresaId, p_fecha: date });
+  if (error) throw error;
+  return (data ?? []).map((x: Record<string, unknown>) => ({
+    supplyId: String(x.insumo_id), code: String(x.codigo), name: String(x.nombre), category: String(x.categoria), unit: String(x.unidad),
+    openingStock: Number(x.stock_inicial), purchased: Number(x.comprado), consumed: Number(x.consumido), waste: Number(x.merma),
+    adjustment: Number(x.ajuste), closingStock: Number(x.stock_final), minStock: Number(x.stock_minimo), suggestedPurchase: Number(x.compra_sugerida),
   }));
 }
 export async function getRecipeLines(): Promise<RecipeLine[]> {
