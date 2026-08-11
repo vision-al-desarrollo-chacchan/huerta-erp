@@ -64,6 +64,20 @@ export async function createProduct(input: { name: string; category: string; pri
   return product;
 }
 
+export async function updateProduct(id:string,input:{name:string;category:string;price:number}){
+  const name=input.name.trim();
+  const category=input.category.trim();
+  if(!name||!category)throw new Error('Completa el nombre y la categoría del plato.');
+  if(!Number.isFinite(input.price)||input.price<=0)throw new Error('Ingresa un precio mayor a cero.');
+  const{empresaId}=await context();
+  const{data:duplicate,error:duplicateError}=await supabase.from('rest_productos').select('id').eq('empresa_id',empresaId).neq('id',id).ilike('nombre',name).ilike('categoria',category).limit(1).maybeSingle();
+  if(duplicateError)throw duplicateError;
+  if(duplicate)throw new Error('Ya existe otro plato con ese nombre en la categoría.');
+  const{data,error}=await supabase.from('rest_productos').update({nombre:name,categoria:category,precio:input.price}).eq('empresa_id',empresaId).eq('id',id).select('id,nombre,categoria,precio,stock,activo').single();
+  if(error)throw error;
+  return{id:data.id,name:data.nombre,category:data.categoria,price:Number(data.precio),stock:Number(data.stock),active:data.activo}satisfies RestaurantProduct;
+}
+
 export async function deactivateProduct(id:string){const {empresaId}=await context();const {error}=await supabase.from('rest_productos').update({activo:false}).eq('empresa_id',empresaId).eq('id',id);if(error)throw error;}
 export async function cancelOrder(id:string,reason:string){const {error}=await supabase.rpc('erp_anular_pedido',{p_pedido_id:id,p_motivo:reason});if(error)throw error;}
 
