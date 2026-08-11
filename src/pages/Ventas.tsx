@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
-import { createOrder, createProduct, deactivateProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData } from '../services/restaurant-store';
+import { CheckCircle, Minus, Pencil, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
+import { createOrder, createProduct, deactivateProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData, updateProduct } from '../services/restaurant-store';
 import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
@@ -23,6 +23,8 @@ export default function Ventas() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', category: '', price: '' });
   const [savingProduct, setSavingProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<RestaurantProduct | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', category: '', price: '' });
   const [showMobileOrder, setShowMobileOrder] = useState(false);
   const { notify } = useNotification();
   const operator = getActiveOperator();
@@ -100,6 +102,25 @@ export default function Ventas() {
     }
   }
 
+  function startEditing(product:RestaurantProduct){
+    setEditingProduct(product);
+    setEditForm({name:product.name,category:product.category,price:String(product.price)});
+  }
+
+  async function saveEdit(event:React.FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(!editingProduct||savingProduct)return;
+    setSavingProduct(true);
+    try{
+      const updated=await updateProduct(editingProduct.id,{name:editForm.name,category:editForm.category,price:Number(editForm.price)});
+      setProducts(current=>current.map(product=>product.id===updated.id?updated:product));
+      setCart(current=>current.map(item=>item.productId===updated.id?{...item,name:updated.name,unitPrice:updated.price}:item));
+      setEditingProduct(null);
+      notify(`${updated.name} fue actualizado en la carta.`,'success');
+    }catch(reason){notify(userErrorMessage(reason,'No se pudo actualizar el plato.'),'error');}
+    finally{setSavingProduct(false);}
+  }
+
   async function sendOrder() {
     if (sending) return;
     setSending(true);
@@ -159,7 +180,7 @@ export default function Ventas() {
               <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-800">{product.category}</span>
               <p className="mt-4 font-bold text-slate-900 dark:text-white">{product.name}</p>
               <div className="mt-3 flex items-end justify-between"><strong className="text-lg text-blue-600">{money.format(product.price)}</strong><span className="text-xs text-slate-400">Stock {product.stock}</span></div>
-            </button>{canManageProducts && <button type="button" title="Desactivar plato" aria-label={`Desactivar ${product.name}`} onClick={async()=>{if(!confirm(`¿Desactivar ${product.name}? Dejará de aparecer en el POS.`))return;try{await deactivateProduct(product.id);setProducts(await getProducts());notify('Plato desactivado.','success')}catch(reason){notify(userErrorMessage(reason,'No se pudo desactivar.'),'error')}}} className="absolute right-2 top-2 rounded-full bg-white/95 p-1.5 text-red-600 shadow"><X className="h-4 w-4"/></button>}</div>
+            </button>{canManageProducts && <div className="absolute right-2 top-2 flex gap-1"><button type="button" title="Editar nombre y precio" aria-label={`Editar ${product.name}`} onClick={()=>startEditing(product)} className="rounded-full bg-white/95 p-2 text-blue-600 shadow"><Pencil className="h-4 w-4"/></button><button type="button" title="Retirar de la carta" aria-label={`Retirar ${product.name}`} onClick={async()=>{if(!confirm(`¿Retirar ${product.name} de la carta? Los pedidos anteriores se conservarán.`))return;try{await deactivateProduct(product.id);setProducts(await getProducts());setCart(current=>current.filter(item=>item.productId!==product.id));notify('Plato retirado de la carta.','success')}catch(reason){notify(userErrorMessage(reason,'No se pudo retirar.'),'error')}}} className="rounded-full bg-white/95 p-2 text-red-600 shadow"><Trash2 className="h-4 w-4"/></button></div>}</div>
           ))}
         </div>
       </section>
@@ -204,6 +225,7 @@ export default function Ventas() {
           <button disabled={sending} onClick={sendOrder} className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : 'Enviar a cocina'}</button>
         </div>
       </aside>
+      {editingProduct && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveEdit} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="flex items-start justify-between"><div><h2 className="text-xl font-black text-slate-950 dark:text-white">Editar plato</h2><p className="text-sm text-slate-500">Los pedidos anteriores conservarán sus datos originales.</p></div><button type="button" onClick={()=>setEditingProduct(null)} className="rounded-lg p-2 text-slate-500"><X className="h-5 w-5"/></button></div><label className="block text-xs font-black uppercase text-slate-600">Nombre<input required value={editForm.name} onChange={event=>setEditForm(current=>({...current,name:event.target.value}))} className="mt-1 w-full rounded-xl border p-3 text-base font-semibold normal-case text-slate-950 dark:bg-slate-950 dark:text-white"/></label><label className="block text-xs font-black uppercase text-slate-600">Categoría<input required list="menu-categories" value={editForm.category} onChange={event=>setEditForm(current=>({...current,category:event.target.value}))} className="mt-1 w-full rounded-xl border p-3 text-base font-semibold normal-case text-slate-950 dark:bg-slate-950 dark:text-white"/></label><label className="block text-xs font-black uppercase text-slate-600">Precio S/<input required type="number" min="0.01" step="0.01" value={editForm.price} onChange={event=>setEditForm(current=>({...current,price:event.target.value}))} className="mt-1 w-full rounded-xl border p-3 text-xl font-black normal-case text-slate-950 dark:bg-slate-950 dark:text-white"/></label><div className="grid grid-cols-2 gap-3"><button type="button" onClick={()=>setEditingProduct(null)} className="rounded-xl bg-slate-100 py-3 font-bold text-slate-700">Cancelar</button><button disabled={savingProduct} className="rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50">{savingProduct?'Guardando…':'Guardar cambios'}</button></div></form></div>}
       {!showMobileOrder && <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.14)] dark:border-slate-800 dark:bg-slate-900 lg:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button type="button" onClick={() => setShowMobileOrder(true)} className="min-w-0 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-left dark:bg-slate-800">
