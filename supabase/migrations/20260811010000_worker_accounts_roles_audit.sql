@@ -3,6 +3,9 @@ alter table public.rest_miembros
   add column if not exists roles text[],
   add column if not exists email text;
 
+alter table public.rest_miembros drop constraint if exists rest_miembros_rol_check;
+alter table public.rest_miembros add constraint rest_miembros_rol_check check (rol in ('propietario','administrador','cajero','mozo','moza_cajera','cocina','supervisor'));
+
 update public.rest_miembros set roles=array[rol] where roles is null or cardinality(roles)=0;
 alter table public.rest_miembros alter column roles set default array['mozo']::text[];
 alter table public.rest_miembros drop constraint if exists rest_miembros_roles_check;
@@ -15,6 +18,8 @@ create or replace function public.rest_es_admin(target_empresa uuid) returns boo
 language sql stable security definer set search_path=public as $$
  select exists(select 1 from public.rest_miembros where empresa_id=target_empresa and user_id=auth.uid() and activo and ('propietario'=any(roles) or 'administrador'=any(roles)));
 $$;
+revoke all on function public.rest_es_admin(uuid) from public;
+grant execute on function public.rest_es_admin(uuid) to authenticated;
 
 create table if not exists public.erp_actividad_empleados(
   id uuid primary key default gen_random_uuid(),
@@ -29,4 +34,4 @@ create index if not exists erp_actividad_empleados_idx on public.erp_actividad_e
 alter table public.erp_actividad_empleados enable row level security;
 drop policy if exists erp_actividad_empleados_admin on public.erp_actividad_empleados;
 create policy erp_actividad_empleados_admin on public.erp_actividad_empleados for select to authenticated using(public.rest_es_admin(empresa_id));
-
+grant select on public.erp_actividad_empleados to authenticated;
