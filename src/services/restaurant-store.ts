@@ -64,6 +64,9 @@ export async function createProduct(input: { name: string; category: string; pri
   return product;
 }
 
+export async function deactivateProduct(id:string){const {empresaId}=await context();const {error}=await supabase.from('rest_productos').update({activo:false}).eq('empresa_id',empresaId).eq('id',id);if(error)throw error;}
+export async function cancelOrder(id:string,reason:string){const {error}=await supabase.rpc('erp_anular_pedido',{p_pedido_id:id,p_motivo:reason});if(error)throw error;}
+
 type OrderRow = {
   id: string; caja_id: string | null; numero: number; tipo_servicio: ServiceType; mesa: string | null; cliente: string | null;
   estado: OrderStatus; metodo_pago: string | null; created_at: string; updated_at: string;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
-import { createOrder, createProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData } from '../services/restaurant-store';
+import { createOrder, createProduct, deactivateProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData } from '../services/restaurant-store';
 import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
@@ -152,11 +152,11 @@ export default function Ventas() {
         {loading && <p className="py-10 text-center text-sm text-slate-400">Cargando productos...</p>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product) => (
-            <button key={product.id} onClick={() => addProduct(product.id)} className="min-h-36 touch-manipulation rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg active:scale-[0.98] active:border-blue-600 active:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:active:bg-slate-800">
+            <div key={product.id} className="relative"><button onClick={() => addProduct(product.id)} className="min-h-36 w-full touch-manipulation rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-lg active:scale-[0.98] active:border-blue-600 active:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:active:bg-slate-800">
               <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-800">{product.category}</span>
               <p className="mt-4 font-bold text-slate-900 dark:text-white">{product.name}</p>
               <div className="mt-3 flex items-end justify-between"><strong className="text-lg text-blue-600">{money.format(product.price)}</strong><span className="text-xs text-slate-400">Stock {product.stock}</span></div>
-            </button>
+            </button><button type="button" title="Desactivar plato" aria-label={`Desactivar ${product.name}`} onClick={async()=>{if(!confirm(`¿Desactivar ${product.name}? Dejará de aparecer en el POS.`))return;try{await deactivateProduct(product.id);setProducts(await getProducts());notify('Plato desactivado.','success')}catch(reason){notify(userErrorMessage(reason,'No se pudo desactivar.'),'error')}}} className="absolute right-2 top-2 rounded-full bg-white/95 p-1.5 text-red-600 shadow"><X className="h-4 w-4"/></button></div>
           ))}
         </div>
       </section>

@@ -40,6 +40,8 @@ export type InventoryPurchase = {
   unitCost: number;
   provider: string;
   createdAt: string;
+  status: 'registrada' | 'anulada';
+  cancellationReason?: string;
 };
 export type DailyInventorySummary = {
   supplyId: string;
@@ -185,7 +187,7 @@ export async function getInventoryPurchases(): Promise<InventoryPurchase[]> {
   const { data, error } = await supabase
     .from("rest_compras_inventario")
     .select(
-      "id,presentacion,cantidad_presentaciones,cantidad_base,unidad_base,costo_total,costo_unitario,proveedor,created_at,rest_insumos(nombre)",
+      "id,presentacion,cantidad_presentaciones,cantidad_base,unidad_base,costo_total,costo_unitario,proveedor,estado,motivo_anulacion,created_at,rest_insumos(nombre)",
     )
     .eq("empresa_id", empresaId)
     .order("created_at", { ascending: false })
@@ -201,6 +203,8 @@ export async function getInventoryPurchases(): Promise<InventoryPurchase[]> {
       costo_total: number;
       costo_unitario: number;
       proveedor: string | null;
+      estado: 'registrada' | 'anulada';
+      motivo_anulacion: string | null;
       created_at: string;
       rest_insumos: { nombre: string } | null;
     }>
@@ -215,8 +219,12 @@ export async function getInventoryPurchases(): Promise<InventoryPurchase[]> {
     unitCost: Number(x.costo_unitario),
     provider: x.proveedor ?? "Sin proveedor",
     createdAt: x.created_at,
+    status: x.estado,
+    cancellationReason: x.motivo_anulacion ?? undefined,
   }));
 }
+export async function cancelInventoryPurchase(id:string,reason:string){const {error}=await supabase.rpc('erp_anular_compra_inventario',{p_compra_id:id,p_motivo:reason});if(error)throw error;}
+export async function deactivateSupply(id:string){const {empresaId}=await getBusinessContext();const {error}=await supabase.from('rest_insumos').update({activo:false}).eq('empresa_id',empresaId).eq('id',id);if(error)throw error;}
 export async function getInventoryMovements(): Promise<InventoryMovement[]> {
   const { empresaId } = await getBusinessContext();
   const { data, error } = await supabase
