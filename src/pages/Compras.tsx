@@ -8,6 +8,7 @@ import {
 import { PackageCheck, Plus, ShoppingCart, Truck } from "lucide-react";
 import {
   createSupply,
+  cancelInventoryPurchase,
   getInventoryPurchases,
   getSupplies,
   registerInventoryPurchase,
@@ -87,10 +88,11 @@ export default function Compras() {
     return () => clearTimeout(t);
   }, []);
   const total = useMemo(
-    () => purchases.reduce((s, x) => s + x.totalCost, 0),
+    () => purchases.filter(x=>x.status==='registrada').reduce((s, x) => s + x.totalCost, 0),
     [purchases],
   );
-  const providers = new Set(purchases.map((x) => x.provider)).size;
+  const activePurchases = purchases.filter(x=>x.status==='registrada');
+  const providers = new Set(activePurchases.map((x) => x.provider)).size;
   const unit =
     supplies.find((x) => x.id === form.supplyId)?.unit ?? "unidad base";
   const save = async () => {
@@ -172,7 +174,7 @@ export default function Compras() {
         <Card
           icon={<PackageCheck />}
           label="Compras recibidas"
-          value={String(purchases.length)}
+          value={String(activePurchases.length)}
         />
         <Card icon={<Truck />} label="Proveedores" value={String(providers)} />
       </div>
@@ -187,11 +189,12 @@ export default function Compras() {
                 <th>Ingreso a stock</th>
                 <th>Costo unitario</th>
                 <th>Total</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody>
               {purchases.map((x) => (
-                <tr key={x.id} className="border-b">
+                <tr key={x.id} className={`border-b ${x.status==='anulada'?'bg-slate-50 opacity-60':''}`}>
                   <td className="p-4">
                     <b>{x.supplyName}</b>
                     <small className="block text-slate-400">
@@ -208,7 +211,8 @@ export default function Compras() {
                   <td>
                     S/ {x.unitCost.toFixed(2)} / {x.unit}
                   </td>
-                  <td className="font-bold">S/ {x.totalCost.toFixed(2)}</td>
+                  <td className="font-bold">S/ {x.totalCost.toFixed(2)}{x.status==='anulada'&&<small className="block text-red-600">ANULADA · {x.cancellationReason}</small>}</td>
+                  <td>{x.status==='registrada'&&<button className="font-black text-red-600" onClick={async()=>{const reason=prompt('Motivo obligatorio para anular la compra:');if(!reason?.trim())return;try{await cancelInventoryPurchase(x.id,reason);await load()}catch(e){setError(errorMessage(e,'No se pudo anular.'))}}}>Anular</button>}</td>
                 </tr>
               ))}
             </tbody>
