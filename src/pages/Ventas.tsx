@@ -5,6 +5,7 @@ import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from 
 import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
 import { userErrorMessage } from '../lib/errors';
+import { getActiveOperator } from '../services/operator-session';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
@@ -24,6 +25,8 @@ export default function Ventas() {
   const [savingProduct, setSavingProduct] = useState(false);
   const [showMobileOrder, setShowMobileOrder] = useState(false);
   const { notify } = useNotification();
+  const operator = getActiveOperator();
+  const canManageProducts = !operator || (operator.roles?.length ? operator.roles : [operator.role]).includes('supervisor');
 
   useEffect(() => {
     let active = true;
@@ -137,12 +140,12 @@ export default function Ventas() {
             <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar plato o bebida..." className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
           </div>
-          <button onClick={() => setShowProductForm(true)} className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 sm:w-auto"><Plus className="h-5 w-5" />Agregar plato</button>
+          {canManageProducts && <button onClick={() => setShowProductForm(true)} className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 sm:w-auto"><Plus className="h-5 w-5" />Agregar plato</button>}
         </div>
         <div className="mb-4 flex min-w-0 gap-2 overflow-x-auto pb-2">
           {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${category === item ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item}</button>)}
         </div>
-        {showProductForm && <form onSubmit={saveProduct} className="mb-4 grid min-w-0 gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900 sm:grid-cols-2">
+        {canManageProducts && showProductForm && <form onSubmit={saveProduct} className="mb-4 grid min-w-0 gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900 sm:grid-cols-2">
           <input required value={newProduct.name} onChange={(event) => setNewProduct((current) => ({ ...current, name: event.target.value }))} placeholder="Nombre del plato" className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-950 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
           <input required value={newProduct.category} onChange={(event) => setNewProduct((current) => ({ ...current, category: event.target.value }))} list="menu-categories" placeholder="Categoría" className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-950 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
           <datalist id="menu-categories">{categories.filter((item) => item !== 'Todas').map((item) => <option key={item} value={item} />)}</datalist>
@@ -156,7 +159,7 @@ export default function Ventas() {
               <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-800">{product.category}</span>
               <p className="mt-4 font-bold text-slate-900 dark:text-white">{product.name}</p>
               <div className="mt-3 flex items-end justify-between"><strong className="text-lg text-blue-600">{money.format(product.price)}</strong><span className="text-xs text-slate-400">Stock {product.stock}</span></div>
-            </button><button type="button" title="Desactivar plato" aria-label={`Desactivar ${product.name}`} onClick={async()=>{if(!confirm(`¿Desactivar ${product.name}? Dejará de aparecer en el POS.`))return;try{await deactivateProduct(product.id);setProducts(await getProducts());notify('Plato desactivado.','success')}catch(reason){notify(userErrorMessage(reason,'No se pudo desactivar.'),'error')}}} className="absolute right-2 top-2 rounded-full bg-white/95 p-1.5 text-red-600 shadow"><X className="h-4 w-4"/></button></div>
+            </button>{canManageProducts && <button type="button" title="Desactivar plato" aria-label={`Desactivar ${product.name}`} onClick={async()=>{if(!confirm(`¿Desactivar ${product.name}? Dejará de aparecer en el POS.`))return;try{await deactivateProduct(product.id);setProducts(await getProducts());notify('Plato desactivado.','success')}catch(reason){notify(userErrorMessage(reason,'No se pudo desactivar.'),'error')}}} className="absolute right-2 top-2 rounded-full bg-white/95 p-1.5 text-red-600 shadow"><X className="h-4 w-4"/></button>}</div>
           ))}
         </div>
       </section>
