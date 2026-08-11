@@ -6,11 +6,14 @@ import {
   getEmployees,
   getInvitations,
   getMembers,
+  getEmployeeActivity,
+  manageWorkerAccount,
   removeEmployeePin,
-  setMember,
   type Employee,
   type Invitation,
   type Member,
+  type MemberRole,
+  type EmployeeActivity,
 } from '../services/erp-store';
 import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
 
@@ -23,6 +26,7 @@ const roles: { value: ActiveOperator['role']; label: string }[] = [
   { value: 'cocina', label: 'Cocina' },
   { value: 'supervisor', label: 'Supervisor' },
 ];
+const accountRoles: { value: MemberRole; label: string }[] = [{ value: 'administrador', label: 'Administrador' }, ...roles];
 
 export default function Usuarios() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -32,6 +36,9 @@ export default function Usuarios() {
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', rol: 'administrador' });
+  const [accountForm, setAccountForm] = useState<{name:string;email:string;password:string;roles:MemberRole[]}>({ name: '', email: '', password: '', roles: ['mozo'] });
+  const [activity, setActivity] = useState<EmployeeActivity[]>([]);
+  const [activityName, setActivityName] = useState('');
   const [pinForm, setPinForm] = useState<{ employeeId: string; role: ActiveOperator['role']; pin: string }>({ employeeId: '', role: 'cajero', pin: '' });
   const [switchForm, setSwitchForm] = useState({ employeeId: '', pin: '' });
   const [activeOperator, setActiveOperatorState] = useState(getActiveOperator());
@@ -75,6 +82,23 @@ export default function Usuarios() {
     }
   };
 
+  const toggleAccountRole = (role: MemberRole) => setAccountForm(current => ({ ...current, roles: current.roles.includes(role) ? current.roles.filter(item => item !== role) : [...current.roles, role] }));
+  const createAccount = async () => {
+    if (!accountForm.name.trim()) return setError('Ingresa el nombre del trabajador.');
+    if (!/^\S+@\S+\.\S+$/.test(accountForm.email)) return setError('Ingresa un correo válido.');
+    if (accountForm.password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+    if (!accountForm.roles.length) return setError('Selecciona por lo menos un rol.');
+    setSaving(true);
+    try {
+      await manageWorkerAccount({ action: 'create', ...accountForm });
+      setAccountForm({ name: '', email: '', password: '', roles: ['mozo'] });
+      setNotice('Cuenta creada. El trabajador ya puede ingresar con su correo y contraseña.');
+      setError('');
+      await load();
+    } catch (reason) { setError(errorMessage(reason, 'No se pudo crear la cuenta.')); }
+    finally { setSaving(false); }
+  };
+
   const savePin = async () => {
     if (!pinForm.employeeId) return setError('Selecciona un trabajador activo.');
     if (!/^\d{6}$/.test(pinForm.pin)) return setError('El PIN debe tener exactamente 6 números.');
@@ -116,6 +140,18 @@ export default function Usuarios() {
 
     {error && <div className="rounded-xl bg-red-50 p-4 font-bold text-red-700">{error}</div>}
     {notice && <div className="rounded-xl bg-emerald-50 p-4 font-bold text-emerald-700">{notice}</div>}
+
+    <section className="rounded-2xl border bg-white p-5">
+      <h2 className="text-lg font-black">Crear cuenta del trabajador</h2>
+      <p className="mb-4 text-sm font-medium text-slate-500">El trabajador ingresará con su propio correo y contraseña. Puedes asignarle uno o varios roles.</p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <input className={cls} placeholder="Nombre completo" value={accountForm.name} onChange={event=>setAccountForm({...accountForm,name:event.target.value})}/>
+        <input className={cls} type="email" placeholder="trabajador@correo.com" value={accountForm.email} onChange={event=>setAccountForm({...accountForm,email:event.target.value})}/>
+        <input className={cls} type="password" autoComplete="new-password" placeholder="Contraseña (mínimo 8 caracteres)" value={accountForm.password} onChange={event=>setAccountForm({...accountForm,password:event.target.value})}/>
+        <div className="rounded-xl border border-slate-300 p-3"><p className="mb-2 text-xs font-black uppercase text-slate-600">Roles</p><div className="flex flex-wrap gap-3">{accountRoles.map(role=><label key={role.value} className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={accountForm.roles.includes(role.value)} onChange={()=>toggleAccountRole(role.value)}/>{role.label}</label>)}</div></div>
+      </div>
+      <button disabled={saving} onClick={()=>void createAccount()} className="mt-4 rounded-xl bg-blue-600 px-6 py-3 font-black text-white disabled:opacity-50">{saving?'Creando...':'Crear cuenta'}</button>
+    </section>
 
     <section className="rounded-2xl border bg-white p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -169,10 +205,12 @@ export default function Usuarios() {
 
     <section className="overflow-x-auto rounded-2xl border bg-white">
       <h2 className="p-5 text-lg font-black">Cuentas con correo</h2>
-      <table className="w-full text-left"><thead className="bg-slate-50 text-xs font-black uppercase text-slate-600"><tr><th className="p-4">Usuario</th><th>Rol</th><th>Estado</th></tr></thead>
-        <tbody className="divide-y">{members.map((member) => <tr key={member.user_id}><td className="p-4 font-black">{member.nombre || 'Usuario'}<small className="block font-medium text-slate-500">{member.user_id.slice(0, 8)}…</small></td><td><select disabled={member.rol === 'propietario'} className="rounded-lg border p-2 font-bold" value={member.rol} onChange={async (event) => { await setMember(member.user_id, { rol: event.target.value as Member['rol'] }); await load(); }}><option value="propietario">Propietario</option><option value="administrador">Administrador</option><option value="cajero">Cajero</option><option value="mozo">Mozo</option><option value="cocina">Cocina</option></select></td><td><button disabled={member.rol === 'propietario'} onClick={async () => { await setMember(member.user_id, { activo: !member.activo }); await load(); }} className={`rounded-full px-3 py-1 font-black ${member.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{member.activo ? 'Activo' : 'Inactivo'}</button></td></tr>)}</tbody>
+      <table className="w-full min-w-[850px] text-left"><thead className="bg-slate-50 text-xs font-black uppercase text-slate-600"><tr><th className="p-4">Usuario</th><th>Roles</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody className="divide-y">{members.map((member) => <tr key={member.user_id}><td className="p-4 font-black">{member.nombre || 'Usuario'}<small className="block font-medium text-slate-500">{member.email || `${member.user_id.slice(0, 8)}…`}</small></td><td className="capitalize">{member.roles.join(' · ').replaceAll('_',' ')}</td><td><button disabled={member.rol === 'propietario'} onClick={async () => { await manageWorkerAccount({action:'active',userId:member.user_id,active:!member.activo}); await load(); }} className={`rounded-full px-3 py-1 font-black ${member.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{member.activo ? 'Activo' : 'Inactivo'}</button></td><td><div className="flex flex-wrap gap-3"><button disabled={member.rol==='propietario'} className="font-black text-blue-600" onClick={async()=>{const password=prompt('Nueva contraseña (mínimo 8 caracteres)');if(!password)return;if(password.length<8)return setError('La contraseña debe tener al menos 8 caracteres.');await manageWorkerAccount({action:'password',userId:member.user_id,password});setNotice('Contraseña actualizada.');}}>Cambiar contraseña</button><button className="font-black text-slate-700" onClick={async()=>{setActivity(await getEmployeeActivity(member.user_id));setActivityName(member.nombre||'Usuario');}}>Ver actividad</button></div></td></tr>)}</tbody>
       </table>
     </section>
+
+    {activityName && <section className="rounded-2xl border bg-white p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-black">Actividad de {activityName}</h2><button className="font-black text-slate-500" onClick={()=>{setActivityName('');setActivity([]);}}>Cerrar</button></div>{activity.length===0?<p className="text-slate-500">Todavía no hay acciones registradas.</p>:<div className="space-y-2">{activity.map(item=><div key={item.id} className="rounded-xl bg-slate-50 p-3"><p className="font-black capitalize">{item.accion.replaceAll('_',' ')}</p><p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString('es-PE')}</p></div>)}</div>}</section>}
 
     <section className="overflow-x-auto rounded-2xl border bg-white">
       <h2 className="p-5 text-lg font-black">Invitaciones pendientes</h2>
