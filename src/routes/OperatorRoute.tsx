@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
-import { canOperatorAccess, operatorHome } from '../services/operator-permissions';
+import { canOperatorRolesAccess, operatorRolesHome } from '../services/operator-permissions';
 
 export default function OperatorRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -14,7 +14,8 @@ export default function OperatorRoute({ children }: { children: ReactNode }) {
   }, []);
 
   if (!operator) return children;
-  if (canOperatorAccess(operator.role, location.pathname)) return children;
+  const roles = operator.roles?.length ? operator.roles : [operator.role];
+  if (canOperatorRolesAccess(roles, location.pathname)) return children;
 
-  return <Navigate to={operatorHome(operator.role)} replace />;
+  return <Navigate to={operatorRolesHome(roles)} replace />;
 }
