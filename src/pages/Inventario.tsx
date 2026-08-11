@@ -19,6 +19,7 @@ import {
 import { getProducts } from "../services/restaurant-store";
 import {
   deleteRecipeLine,
+  deactivateSupply,
   getInventoryMovements,
   getDailyInventorySummary,
   getRecipeLines,
@@ -254,6 +255,7 @@ export default function Inventario() {
                     <th>Mínimo</th>
                     <th>Costo promedio</th>
                     <th>Estado</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,6 +270,7 @@ export default function Inventario() {
                       <td>
                         {x.stock} {x.unit}
                       </td>
+                      <td><button className="font-black text-red-600" onClick={()=>{if(confirm(`¿Desactivar ${x.name}? Ya no aparecerá para nuevas compras o recetas.`))void run(()=>deactivateSupply(x.id))}}>Desactivar</button></td>
                       <td>{x.minStock}</td>
                       <td>
                         S/ {x.averageCost.toFixed(2)} / {x.unit}
