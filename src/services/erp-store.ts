@@ -13,6 +13,7 @@ export type AccountingEntry = { id: string; fecha: string; tipo: 'ingreso' | 'eg
 export type MemberRole = 'propietario' | 'administrador' | 'cajero' | 'mozo' | 'moza_cajera' | 'cocina' | 'supervisor';
 export type Member = { empresa_id: string; user_id: string; rol: MemberRole; roles: MemberRole[]; activo: boolean; nombre: string | null; email: string | null };
 export type EmployeeActivity = { id: string; user_id: string; accion: string; detalle: Record<string, unknown>; created_at: string };
+export type PayrollPayment = { id:string; empleado_id:string; periodo:string; monto:number; metodo_pago:string; observacion:string|null; created_at:string };
 export type Invitation = { id: string; email: string; rol: string; token: string; estado: 'pendiente' | 'usada' | 'revocada'; created_at: string };
 export type CompanySettings = { empresaId: string; branchId: string; nombre: string; nombreComercial: string; ruc: string; telefono: string; direccion: string; sucursal: string; sucursalDireccion: string; moneda: string; igv: number; serieBoleta: string; serieFactura: string };
 
@@ -111,6 +112,9 @@ export async function setEmployeeStatus(id: string, estado: Employee['estado']) 
   const { error } = await supabase.from('erp_empleados').update({ estado }).eq('id', id).eq('empresa_id', empresaId);
   if (error) throw error;
 }
+
+export async function getPayrollPayments():Promise<PayrollPayment[]> { const empresaId=await companyId(); const {data,error}=await supabase.from('erp_pagos_trabajadores').select('id,empleado_id,periodo,monto,metodo_pago,observacion,created_at').eq('empresa_id',empresaId).order('created_at',{ascending:false}).limit(100); if(error)throw error; return(data??[]).map(row=>({...row,monto:Number(row.monto)})) as PayrollPayment[]; }
+export async function registerPayrollPayment(input:{employeeId:string;period:string;amount:number;paymentMethod:string;note?:string}) { const empresaId=await companyId(); const {error}=await supabase.rpc('erp_registrar_pago_trabajador',{p_empresa_id:empresaId,p_empleado_id:input.employeeId,p_periodo:input.period,p_monto:input.amount,p_metodo_pago:input.paymentMethod,p_observacion:input.note??null}); if(error)throw error; }
 
 
 export async function configureEmployeePin(employeeId: string, role: ActiveOperator['role'], pin: string) {
