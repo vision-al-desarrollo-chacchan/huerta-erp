@@ -52,7 +52,7 @@ export default function Reportes() {
   const paid = orders.filter(
       (o) => o.status === "pagado" && new Date(o.updatedAt) >= start,
     ),
-    buys = purchases.filter((p) => new Date(p.createdAt) >= start),
+    buys = purchases.filter((p) => p.status === 'registrada' && new Date(p.createdAt) >= start),
     manual = entries.filter(
       (e) => new Date(`${e.fecha}T00:00:00`) >= start,
     );
