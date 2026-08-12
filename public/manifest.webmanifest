@@ -1,0 +1,20 @@
+{
+  "name": "Huerta ERP",
+  "short_name": "Huerta ERP",
+  "description": "Sistema de gestión para restaurantes y negocios",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#15803d",
+  "orientation": "any",
+  "lang": "es-PE",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
