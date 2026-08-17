@@ -7,6 +7,7 @@ const APP_SHELL = [
   "/pwa-icon-192.png",
   "/pwa-icon-512.png",
   "/pwa-icon-maskable-512.png",
+  "/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
