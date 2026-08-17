@@ -16,6 +16,7 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   notes?: string;
+  additionId?: string;
 }
 
 export interface RestaurantOrder {
@@ -26,6 +27,7 @@ export interface RestaurantOrder {
   table?: string;
   customer?: string;
   status: OrderStatus;
+  activeAdditionId?: string;
   items: OrderItem[];
   paymentMethod?: string;
   createdAt: string;

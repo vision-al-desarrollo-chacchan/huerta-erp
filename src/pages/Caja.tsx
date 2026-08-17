@@ -161,7 +161,7 @@ export default function Caja() {
         </div>
       </>}
       {closedReport && <>
-        <style>{`@media print { body * { visibility: hidden !important; } #cash-close-receipt, #cash-close-receipt * { visibility: visible !important; } #cash-close-receipt { position: absolute !important; left: 0; top: 0; width: 72mm !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; color: #000 !important; background: #fff !important; } .receipt-actions { display: none !important; } } @page { size: 80mm auto; margin: 4mm; }`}</style>
+        <style>{`@media print { body * { visibility: hidden !important; } #cash-close-receipt, #cash-close-receipt * { visibility: visible !important; } #cash-close-receipt { position: absolute !important; left: 0; top: 0; width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; color: #000 !important; background: #fff !important; } #cash-close-receipt > *, #cash-close-receipt .receipt-row { break-inside: avoid !important; page-break-inside: avoid !important; } .receipt-actions { display: none !important; } } @page { size: A4 portrait; margin: 12mm; }`}</style>
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
           <div id="cash-close-receipt" className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 text-slate-950 shadow-2xl">
             <div className="text-center"><h2 className="text-xl font-black">CHICKEN HUERTA</h2><p className="text-xs">REPORTE DE CIERRE DE CAJA</p><p className="mt-1 text-xs">{new Date(closedReport.session.closedAt!).toLocaleString('es-PE')}</p></div>
@@ -172,7 +172,7 @@ export default function Caja() {
             <div className="my-3 border-y border-dashed border-slate-400 py-3"><ReceiptRow label="Efectivo esperado" value={money.format(closedReport.session.expectedAmount ?? 0)} strong /><ReceiptRow label="Efectivo contado" value={money.format(closedReport.session.closingAmount ?? 0)} strong /><ReceiptRow label={(closedReport.session.difference ?? 0) < 0 ? 'Faltante' : 'Sobrante'} value={money.format(Math.abs(closedReport.session.difference ?? 0))} strong /><ReceiptRow label="Fondo siguiente turno" value={money.format(closedReport.session.nextShiftFund ?? 0)} strong /><ReceiptRow label="Efectivo retirado" value={money.format(closedReport.session.withdrawnAmount ?? 0)} strong /></div>
             {closedReport.session.notes && <p className="text-xs"><b>Observación:</b> {closedReport.session.notes}</p>}
             <div className="mt-10 grid grid-cols-2 gap-6 text-center text-[10px]"><div className="border-t border-black pt-1">Firma cajero</div><div className="border-t border-black pt-1">Firma administrador</div></div>
-            <div className="receipt-actions mt-6 grid gap-2"><button onClick={() => window.print()} className="rounded-xl bg-blue-600 py-3 font-bold text-white">Imprimir ticket / Guardar PDF</button><button onClick={() => setClosedReport(null)} className="rounded-xl bg-slate-100 py-3 font-bold text-slate-700">Cerrar reporte</button></div>
+            <div className="receipt-actions mt-6 grid gap-2"><button onClick={() => window.print()} className="rounded-xl bg-blue-600 py-3 font-bold text-white">Guardar o enviar liquidación PDF</button><p className="text-center text-[11px] text-slate-500">En celular, elige Guardar como PDF y luego Compartir.</p><button onClick={() => setClosedReport(null)} className="rounded-xl bg-slate-100 py-3 font-bold text-slate-700">Cerrar reporte</button></div>
           </div>
         </div>
       </>}
@@ -181,7 +181,7 @@ export default function Caja() {
 }
 
 function ReceiptRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return <div className={`flex justify-between gap-3 text-xs ${strong ? 'font-bold' : ''}`}><span>{label}</span><span className="text-right">{value}</span></div>;
+  return <div className={`receipt-row flex justify-between gap-3 text-xs ${strong ? 'font-bold' : ''}`}><span>{label}</span><span className="text-right">{value}</span></div>;
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Pencil, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
-import { createOrder, createProduct, deactivateProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData, updateProduct } from '../services/restaurant-store';
+import { addItemsToOrder, createOrder, createProduct, deactivateProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData, updateProduct } from '../services/restaurant-store';
 import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
@@ -66,6 +66,9 @@ export default function Ventas() {
   const occupiedTables = useMemo(() => new Set(orders
     .filter((order) => order.serviceType === 'salon' && !['pagado', 'anulado'].includes(order.status) && order.table)
     .map((order) => order.table as string)), [orders]);
+  const activeTableOrder = useMemo(() => orders.find((order) =>
+    serviceType === 'salon' && order.table === table && !['pagado', 'anulado'].includes(order.status)
+  ), [orders, serviceType, table]);
   const tables = Array.from({ length: 12 }, (_, index) => `Mesa ${index + 1}`);
 
   function addProduct(productId: string) {
@@ -137,13 +140,19 @@ export default function Ventas() {
       return;
     }
     try {
-      const order = await createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
-      void enqueueOrderPrint(order, 'cocina').catch(() => {
+      const additionKey = crypto.randomUUID();
+      const order = activeTableOrder
+        ? await addItemsToOrder(activeTableOrder.id, cart, additionKey)
+        : await createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
+      void enqueueOrderPrint(order, 'cocina', activeTableOrder ? `addition:${additionKey}` : 'v1').catch(() => {
         // La venta queda guardada; la alerta y el reintento se muestran en el centro de impresión.
       });
       setCart([]);
-      setNotice(`Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`);
-      notify(`Pedido #${String(order.number).padStart(3, '0')} enviado a cocina.`, 'success');
+      const message = activeTableOrder
+        ? `Productos agregados al pedido #${String(order.number).padStart(3, '0')} y enviados a cocina.`
+        : `Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`;
+      setNotice(message);
+      notify(message, 'success');
     } catch (reason) {
       const message = userErrorMessage(reason, 'No se pudo registrar el pedido.');
       setNotice(message);
@@ -220,9 +229,10 @@ export default function Ventas() {
           </div>
         </div>
         <div className="order-2 shrink-0 border-t border-slate-200 bg-white p-5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-900 lg:order-3 lg:sticky lg:bottom-0 lg:z-10">
-          {notice && <p className={`mb-3 rounded-lg p-3 text-xs font-semibold ${notice.includes('correctamente') ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{notice}</p>}
+          {notice && <p className={`mb-3 rounded-lg p-3 text-xs font-semibold ${notice.includes('correctamente') || notice.includes('agregados') ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{notice}</p>}
+          {activeTableOrder && <p className="mb-3 rounded-lg bg-blue-50 p-3 text-xs font-bold text-blue-800">{table} tiene el pedido #{String(activeTableOrder.number).padStart(3, '0')} abierto. Los productos nuevos se agregarán a esa misma cuenta.</p>}
           <div className="mb-4 flex items-end justify-between"><span className="text-sm font-semibold text-slate-500">Total</span><strong className="text-3xl text-slate-900 dark:text-white">{money.format(total)}</strong></div>
-          <button disabled={sending} onClick={sendOrder} className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : 'Enviar a cocina'}</button>
+          <button disabled={sending} onClick={sendOrder} className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"><CheckCircle className="h-5 w-5" />{sending ? 'Enviando…' : activeTableOrder ? 'Agregar y enviar a cocina' : 'Enviar a cocina'}</button>
         </div>
       </aside>
       {editingProduct && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveEdit} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="flex items-start justify-between"><div><h2 className="text-xl font-black text-slate-950 dark:text-white">Editar plato</h2><p className="text-sm text-slate-500">Los pedidos anteriores conservarán sus datos originales.</p></div><button type="button" onClick={()=>setEditingProduct(null)} className="rounded-lg p-2 text-slate-500"><X className="h-5 w-5"/></button></div><label className="block text-xs font-black uppercase text-slate-600">Nombre<input required value={editForm.name} onChange={event=>setEditForm(current=>({...current,name:event.target.value}))} className="mt-1 w-full rounded-xl border p-3 text-base font-semibold normal-case text-slate-950 dark:bg-slate-950 dark:text-white"/></label><label className="block text-xs font-black uppercase text-slate-600">Categoría<input required list="menu-categories" value={editForm.category} onChange={event=>setEditForm(current=>({...current,category:event.target.value}))} className="mt-1 w-full rounded-xl border p-3 text-base font-semibold normal-case text-slate-950 dark:bg-slate-950 dark:text-white"/></label><label className="block text-xs font-black uppercase text-slate-600">Precio S/<input required type="number" min="0.01" step="0.01" value={editForm.price} onChange={event=>setEditForm(current=>({...current,price:event.target.value}))} className="mt-1 w-full rounded-xl border p-3 text-xl font-black normal-case text-slate-950 dark:bg-slate-950 dark:text-white"/></label><div className="grid grid-cols-2 gap-3"><button type="button" onClick={()=>setEditingProduct(null)} className="rounded-xl bg-slate-100 py-3 font-bold text-slate-700">Cancelar</button><button disabled={savingProduct} className="rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50">{savingProduct?'Guardando…':'Guardar cambios'}</button></div></form></div>}
