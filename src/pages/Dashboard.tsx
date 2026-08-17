@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Banknote, ChefHat, CircleDollarSign, Clock3, Package, ShoppingBag } from 'lucide-react';
-import { getCashSession, getClosedCashSales, getOrders, getProducts, orderTotal, subscribeRestaurantData, type ClosedCashSale } from '../services/restaurant-store';
+import { getCashSession, getCashSessionSales, getOrders, getProducts, orderTotal, subscribeRestaurantData, type CashSessionSale } from '../services/restaurant-store';
 import type { RestaurantOrder, RestaurantProduct } from '../types/restaurant';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -9,7 +9,7 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [cashOpen, setCashOpen] = useState(false);
   const [products, setProducts] = useState<RestaurantProduct[]>([]);
-  const [closedCashSales, setClosedCashSales] = useState<ClosedCashSale[]>([]);
+  const [cashSessionSales, setCashSessionSales] = useState<CashSessionSale[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -18,8 +18,8 @@ export default function Dashboard() {
         const since = new Date();
         since.setHours(0, 0, 0, 0);
         since.setDate(since.getDate() - 6);
-        const [currentOrders, cash, currentProducts, currentClosedCashSales] = await Promise.all([getOrders(), getCashSession(), getProducts(), getClosedCashSales(since.toISOString())]);
-        setOrders(currentOrders); setCashOpen(cash?.status === 'abierta'); setProducts(currentProducts); setClosedCashSales(currentClosedCashSales);
+        const [currentOrders, cash, currentProducts, currentCashSessionSales] = await Promise.all([getOrders(), getCashSession(), getProducts(), getCashSessionSales(since.toISOString())]);
+        setOrders(currentOrders); setCashOpen(cash?.status === 'abierta'); setProducts(currentProducts); setCashSessionSales(currentCashSessionSales);
       }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar el dashboard.'); }
     };
@@ -53,13 +53,13 @@ export default function Dashboard() {
     });
 
     const indexByDate = new Map(days.map((day, index) => [day.key, index]));
-    closedCashSales.forEach((cashSale) => {
-      const key = new Date(cashSale.closedAt).toLocaleDateString('en-CA');
+    cashSessionSales.forEach((cashSale) => {
+      const key = new Date(cashSale.openedAt).toLocaleDateString('en-CA');
       const index = indexByDate.get(key);
       if (index !== undefined) days[index].total += cashSale.total;
     });
     return days;
-  }, [closedCashSales]);
+  }, [cashSessionSales]);
   const weeklySales = salesByDay.reduce((sum, day) => sum + day.total, 0);
   const highestDailySale = Math.max(...salesByDay.map((day) => day.total), 1);
 
@@ -79,7 +79,7 @@ export default function Dashboard() {
         <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-white">Ventas de los últimos 7 días</h2>
-            <p className="text-sm text-slate-500">Ventas agrupadas por fecha de cierre de caja</p>
+            <p className="text-sm text-slate-500">Cada turno pertenece al día en que se abrió la caja</p>
           </div>
           <div className="sm:text-right">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Total semanal</p>
