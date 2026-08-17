@@ -49,6 +49,7 @@ export default function Dashboard() {
         label: new Intl.DateTimeFormat('es-PE', { weekday: 'short' }).format(date).replace('.', ''),
         shortDate: new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit' }).format(date),
         total: 0,
+        hasOpenCash: false,
       };
     });
 
@@ -56,7 +57,10 @@ export default function Dashboard() {
     cashSessionSales.forEach((cashSale) => {
       const key = new Date(cashSale.openedAt).toLocaleDateString('en-CA');
       const index = indexByDate.get(key);
-      if (index !== undefined) days[index].total += cashSale.total;
+      if (index !== undefined) {
+        days[index].total += cashSale.total;
+        days[index].hasOpenCash ||= cashSale.isOpen;
+      }
     });
     return days;
   }, [cashSessionSales]);
@@ -86,26 +90,28 @@ export default function Dashboard() {
             <strong className="text-2xl text-blue-600">{money.format(weeklySales)}</strong>
           </div>
         </div>
-        <div className="grid h-64 grid-cols-7 items-end gap-2 sm:gap-4" aria-label="Gráfico de ventas de los últimos 7 días">
-          {salesByDay.map((day) => {
-            const height = day.total > 0 ? Math.max((day.total / highestDailySale) * 100, 8) : 2;
-            return (
-              <div key={day.key} className="flex h-full min-w-0 flex-col justify-end text-center">
-                <span className="mb-2 truncate text-[10px] font-black text-slate-700 dark:text-slate-200 sm:text-xs" title={money.format(day.total)}>
-                  {day.total > 0 ? money.format(day.total) : 'S/ 0'}
-                </span>
-                <div className="flex h-44 items-end rounded-lg bg-slate-50 px-1 dark:bg-slate-800">
-                  <div
-                    className="w-full rounded-t-md bg-gradient-to-t from-blue-700 to-sky-400 transition-all duration-500"
-                    style={{ height: `${height}%` }}
-                    title={`${day.label} ${day.shortDate}: ${money.format(day.total)}`}
-                  />
+        <div className="overflow-x-auto pb-2">
+          <div className="relative grid h-72 min-w-[620px] grid-cols-7 items-end gap-3 rounded-2xl bg-slate-50/80 px-4 pb-3 pt-5 dark:bg-slate-950/50 sm:gap-5" aria-label="Gráfico de ventas de los últimos 7 días">
+            <div className="pointer-events-none absolute inset-x-4 top-[25%] border-t border-dashed border-slate-200 dark:border-slate-700" />
+            <div className="pointer-events-none absolute inset-x-4 top-1/2 border-t border-dashed border-slate-200 dark:border-slate-700" />
+            <div className="pointer-events-none absolute inset-x-4 top-[75%] border-t border-dashed border-slate-200 dark:border-slate-700" />
+            {salesByDay.map((day) => {
+              const height = day.total > 0 ? Math.max((day.total / highestDailySale) * 100, 7) : 1;
+              return (
+                <div key={day.key} className="relative z-10 flex h-full min-w-0 flex-col justify-end text-center">
+                  <div className="mb-2 min-h-9">
+                    <span className="block truncate text-[11px] font-black text-slate-700 dark:text-slate-100" title={money.format(day.total)}>{day.total > 0 ? money.format(day.total) : 'S/ 0'}</span>
+                    {day.hasOpenCash && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />En curso</span>}
+                  </div>
+                  <div className="flex h-44 items-end justify-center">
+                    <div className={`w-3/5 min-w-7 max-w-14 rounded-t-xl shadow-sm transition-all duration-500 ${day.hasOpenCash ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gradient-to-t from-blue-700 to-sky-400'}`} style={{ height: `${height}%` }} title={`${day.label} ${day.shortDate}: ${money.format(day.total)}`} />
+                  </div>
+                  <span className="mt-2 text-xs font-black capitalize text-slate-700 dark:text-slate-200">{day.label}</span>
+                  <span className="text-[10px] font-medium text-slate-400">{day.shortDate}</span>
                 </div>
-                <span className="mt-2 text-xs font-bold capitalize text-slate-600 dark:text-slate-300">{day.label}</span>
-                <span className="hidden text-[10px] text-slate-400 sm:block">{day.shortDate}</span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </section>
 
