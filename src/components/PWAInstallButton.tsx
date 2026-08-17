@@ -8,15 +8,13 @@ interface InstallPromptEvent extends Event {
 
 export default function PWAInstallButton() {
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
+  const [installed, setInstalled] = useState(() =>
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    setInstalled(standalone);
-
     const handlePrompt = (event: Event) => {
       event.preventDefault();
       setPromptEvent(event as InstallPromptEvent);
