@@ -103,6 +103,44 @@ export async function getOrders(): Promise<RestaurantOrder[]> {
   return ((data ?? []) as OrderRow[]).map(mapOrder);
 }
 
+export type ClosedCashSale = { closedAt: string; total: number };
+
+export async function getClosedCashSales(since: string): Promise<ClosedCashSale[]> {
+  const { empresaId, sucursalId } = await context();
+  const { data: cashSessions, error: cashError } = await supabase
+    .from('rest_cajas')
+    .select('id,cerrada_at')
+    .eq('empresa_id', empresaId)
+    .eq('sucursal_id', sucursalId)
+    .eq('estado', 'cerrada')
+    .gte('cerrada_at', since)
+    .not('cerrada_at', 'is', null);
+  if (cashError) throw cashError;
+
+  const sessions = cashSessions ?? [];
+  if (!sessions.length) return [];
+
+  const { data: paidOrders, error: ordersError } = await supabase
+    .from('rest_pedidos')
+    .select('caja_id,total')
+    .eq('empresa_id', empresaId)
+    .eq('sucursal_id', sucursalId)
+    .eq('estado', 'pagado')
+    .in('caja_id', sessions.map((session) => session.id));
+  if (ordersError) throw ordersError;
+
+  const totalsByCash = new Map<string, number>();
+  (paidOrders ?? []).forEach((order) => {
+    if (!order.caja_id) return;
+    totalsByCash.set(order.caja_id, (totalsByCash.get(order.caja_id) ?? 0) + Number(order.total));
+  });
+
+  return sessions.map((session) => ({
+    closedAt: session.cerrada_at as string,
+    total: totalsByCash.get(session.id) ?? 0,
+  }));
+}
+
 export async function createOrder(order: { serviceType: ServiceType; table?: string; customer?: string; items: OrderItem[] }) {
   const { empresaId, sucursalId } = await context();
   const cash = await getCashSession();
