@@ -103,13 +103,13 @@ export async function getOrders(): Promise<RestaurantOrder[]> {
   return ((data ?? []) as OrderRow[]).map(mapOrder);
 }
 
-export type CashSessionSale = { openedAt: string; total: number };
+export type CashSessionSale = { openedAt: string; total: number; isOpen: boolean };
 
 export async function getCashSessionSales(since: string): Promise<CashSessionSale[]> {
   const { empresaId, sucursalId } = await context();
   const { data: cashSessions, error: cashError } = await supabase
     .from('rest_cajas')
-    .select('id,abierta_at')
+    .select('id,abierta_at,estado')
     .eq('empresa_id', empresaId)
     .eq('sucursal_id', sucursalId)
     .gte('abierta_at', since);
@@ -136,6 +136,7 @@ export async function getCashSessionSales(since: string): Promise<CashSessionSal
   return sessions.map((session) => ({
     openedAt: session.abierta_at,
     total: totalsByCash.get(session.id) ?? 0,
+    isOpen: session.estado === 'abierta',
   }));
 }
 
