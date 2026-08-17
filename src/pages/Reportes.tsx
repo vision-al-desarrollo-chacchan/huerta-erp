@@ -113,7 +113,8 @@ export default function Reportes() {
     URL.revokeObjectURL(a.href);
   };
   return (
-    <div className="space-y-6 p-6">
+    <div id="daily-report" className="space-y-6 p-6">
+      <style>{`@media print { body * { visibility: hidden !important; } #daily-report, #daily-report * { visibility: visible !important; } #daily-report { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; padding: 0 !important; color: #000 !important; background: #fff !important; } #daily-report section, #daily-report section > div, #daily-report .report-block { break-inside: avoid !important; page-break-inside: avoid !important; box-shadow: none !important; } .report-actions { display: none !important; } } @page { size: A4 portrait; margin: 10mm; }`}</style>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-950">
@@ -123,7 +124,7 @@ export default function Reportes() {
             Ventas, métodos de pago, compras, resultado e inventario.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="report-actions flex gap-2">
           <select
             className="rounded-xl border bg-white px-4 py-3 font-bold"
             value={period}
@@ -144,7 +145,7 @@ export default function Reportes() {
             onClick={() => window.print()}
             className="rounded-xl bg-slate-900 px-5 py-3 font-black text-white"
           >
-            Imprimir
+            Guardar / enviar PDF
           </button>
         </div>
       </div>
@@ -258,7 +259,7 @@ function Kpi({
   tone?: "blue" | "green" | "red";
 }) {
   return (
-    <div className="rounded-2xl border bg-white p-5">
+    <div className="report-block rounded-2xl border bg-white p-5">
       <p className="font-bold text-slate-500">{title}</p>
       <strong
         className={`text-2xl ${tone === "green" ? "text-emerald-600" : tone === "red" ? "text-red-600" : "text-slate-950"}`}

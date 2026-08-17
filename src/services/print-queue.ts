@@ -28,16 +28,16 @@ export async function savePrinterConfigurations(configs: PrinterConfig[]) {
   const {error}=await supabase.from('print_configuraciones').upsert(rows,{onConflict:'empresa_id,sucursal_id,area'}); if(error)throw error;
 }
 
-function orderContent(order: RestaurantOrder, area: PrinterArea) {
+function orderContent(order: RestaurantOrder, area: PrinterArea, isAddition = false) {
   const items=order.items.map(i=>`${i.quantity} x ${i.name}${i.notes?`\n   Nota: ${i.notes}`:''}`).join('\n');
-  return `CHICKEN HUERTA\n${area.toUpperCase()} - COMANDA #${order.number}\n${new Date(order.createdAt).toLocaleString('es-PE')}\nServicio: ${order.serviceType}${order.table?` - Mesa ${order.table}`:''}\n--------------------------------\n${items}\n--------------------------------\n`;
+  return `CHICKEN HUERTA\n${area.toUpperCase()} - ${isAddition ? 'ADICIÓN' : 'COMANDA'} #${order.number}\n${new Date(order.createdAt).toLocaleString('es-PE')}\nServicio: ${order.serviceType}${order.table?` - ${order.table}`:''}\n--------------------------------\n${items}\n--------------------------------\n`;
 }
 
-export async function enqueueOrderPrint(order: RestaurantOrder, area: PrinterArea = 'cocina') {
+export async function enqueueOrderPrint(order: RestaurantOrder, area: PrinterArea = 'cocina', batchKey = 'v1') {
   const configs=await getPrinterConfigurations(); const config=configs.find(c=>c.area===area);
   if(!config?.active || !config.autoPrint) return;
-  const key=`order:${order.id}:${area}:v1`; const current=load(); if(current.some(j=>j.key===key))return;
-  const job:LocalPrintJob={id:crypto.randomUUID(),key,area,printerName:config.printerName,content:orderContent(order,area),status:'pendiente',attempts:0,createdAt:new Date().toISOString()};
+  const key=`order:${order.id}:${area}:${batchKey}`; const current=load(); if(current.some(j=>j.key===key))return;
+  const job:LocalPrintJob={id:crypto.randomUUID(),key,area,printerName:config.printerName,content:orderContent(order,area,batchKey!=='v1'),status:'pendiente',attempts:0,createdAt:new Date().toISOString()};
   persist([...current,job]);
   const {empresaId,sucursalId}=await getBusinessContext();
   await supabase.from('print_jobs').upsert({empresa_id:empresaId,sucursal_id:sucursalId,pedido_id:order.id,area,idempotency_key:key,payload:{printerName:config.printerName,widthMm:config.widthMm,copies:config.copies,content:job.content},estado:'pendiente'},{onConflict:'empresa_id,idempotency_key'});
