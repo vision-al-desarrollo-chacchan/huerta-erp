@@ -103,6 +103,21 @@ export async function getOrders(): Promise<RestaurantOrder[]> {
   return ((data ?? []) as OrderRow[]).map(mapOrder);
 }
 
+export async function getPaidOrdersByDate(start: string, end: string): Promise<RestaurantOrder[]> {
+  const { empresaId, sucursalId } = await context();
+  const { data, error } = await supabase
+    .from('rest_pedidos')
+    .select('id,caja_id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,adicion_activa_id,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas,adicion_id)')
+    .eq('empresa_id', empresaId)
+    .eq('sucursal_id', sucursalId)
+    .eq('estado', 'pagado')
+    .gte('updated_at', start)
+    .lt('updated_at', end)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as OrderRow[]).map(mapOrder);
+}
+
 export type CashSessionSale = { openedAt: string; total: number; isOpen: boolean };
 
 export async function getCashSessionSales(since: string): Promise<CashSessionSale[]> {
