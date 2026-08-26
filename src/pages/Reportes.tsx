@@ -9,7 +9,7 @@ import {
   type InventoryPurchase,
   type Supply,
 } from "../services/inventory-store";
-import { getOrders, orderTotal } from "../services/restaurant-store";
+import { getOrders, getPaidOrdersByDate, orderTotal } from "../services/restaurant-store";
 import type { RestaurantOrder } from "../types/restaurant";
 const money = new Intl.NumberFormat("es-PE", {
   style: "currency",
@@ -21,6 +21,10 @@ export default function Reportes() {
     [entries, setEntries] = useState<AccountingEntry[]>([]),
     [supplies, setSupplies] = useState<Supply[]>([]),
     [period, setPeriod] = useState("30"),
+    [selectedDate, setSelectedDate] = useState(() => new Date().toLocaleDateString("en-CA")),
+    [dailyOrders, setDailyOrders] = useState<RestaurantOrder[] | null>(null),
+    [selectedSale, setSelectedSale] = useState<RestaurantOrder | null>(null),
+    [loadingDay, setLoadingDay] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
     void Promise.all([
@@ -43,13 +47,28 @@ export default function Reportes() {
         ),
       );
   }, []);
+  useEffect(() => {
+    if (period !== "date") {
+      setDailyOrders(null);
+      return;
+    }
+    const start = new Date(`${selectedDate}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    setLoadingDay(true);
+    setError("");
+    void getPaidOrdersByDate(start.toISOString(), end.toISOString())
+      .then(setDailyOrders)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "No se pudieron cargar las ventas del día."))
+      .finally(() => setLoadingDay(false));
+  }, [period, selectedDate]);
   const start = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - Number(period) + 1);
     return d;
   }, [period]);
-  const paid = orders.filter(
+  const paid = period === "date" ? (dailyOrders ?? []) : orders.filter(
       (o) => o.status === "pagado" && new Date(o.updatedAt) >= start,
     ),
     buys = purchases.filter((p) => p.status === 'registrada' && new Date(p.createdAt) >= start),
@@ -134,7 +153,16 @@ export default function Reportes() {
             <option value="7">Últimos 7 días</option>
             <option value="30">Últimos 30 días</option>
             <option value="90">Últimos 90 días</option>
+            <option value="date">Elegir un día</option>
           </select>
+          {period === "date" && <input
+            type="date"
+            value={selectedDate}
+            max={new Date().toLocaleDateString("en-CA")}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="rounded-xl border bg-white px-4 py-3 font-bold"
+            aria-label="Fecha de las ventas"
+          />}
           <button
             onClick={exportCsv}
             className="rounded-xl bg-blue-600 px-5 py-3 font-black text-white"
@@ -212,17 +240,15 @@ export default function Reportes() {
       </section>
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-2xl border bg-white p-5">
-          <h2 className="mb-4 text-lg font-black">Últimas ventas</h2>
-          {paid.length === 0 ? (
+          <h2 className="mb-4 text-lg font-black">{period === "date" ? `Ventas del ${new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-PE")}` : "Últimas ventas"}</h2>
+          {loadingDay ? <p className="py-8 text-center font-bold text-slate-500">Cargando ventas…</p> : paid.length === 0 ? (
             <Empty />
           ) : (
-            paid.slice(0, 8).map((o) => (
-              <div key={o.id} className="flex justify-between border-b py-3">
-                <span className="font-bold">
-                  Pedido #{String(o.number).padStart(3, "0")}
-                </span>
-                <strong>{money.format(orderTotal(o))}</strong>
-              </div>
+            paid.map((o) => (
+              <button type="button" onClick={() => setSelectedSale(o)} key={o.id} className="flex w-full items-center justify-between border-b py-3 text-left transition hover:bg-blue-50">
+                <span><b>Pedido #{String(o.number).padStart(3, "0")}</b><small className="block text-slate-500">{new Date(o.updatedAt).toLocaleString("es-PE")} · {o.paymentMethod || "Sin método"}</small></span>
+                <span className="flex items-center gap-3"><strong>{money.format(orderTotal(o))}</strong><span className="text-sm font-bold text-blue-600">Ver</span></span>
+              </button>
             ))
           )}
         </div>
@@ -246,6 +272,14 @@ export default function Reportes() {
           )}
         </div>
       </section>
+      {selectedSale && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" onClick={() => setSelectedSale(null)}>
+        <section className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="mb-5 flex items-start justify-between"><div><h2 className="text-2xl font-black">Pedido #{String(selectedSale.number).padStart(3, "0")}</h2><p className="text-sm text-slate-500">{new Date(selectedSale.updatedAt).toLocaleString("es-PE")}</p></div><button type="button" onClick={() => setSelectedSale(null)} className="rounded-lg bg-slate-100 px-3 py-2 font-black">Cerrar</button></div>
+          <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 text-sm"><div><span className="text-slate-500">Servicio</span><b className="block capitalize">{selectedSale.table || selectedSale.serviceType}</b></div><div><span className="text-slate-500">Método de pago</span><b className="block">{selectedSale.paymentMethod || "Sin método"}</b></div>{selectedSale.customer && <div className="col-span-2"><span className="text-slate-500">Cliente</span><b className="block">{selectedSale.customer}</b></div>}</div>
+          <div className="divide-y">{selectedSale.items.map((item, index) => <div key={`${item.productId}-${index}`} className="grid grid-cols-[1fr_auto] gap-3 py-3"><div><b>{item.quantity} × {item.name}</b>{item.notes && <small className="block text-slate-500">{item.notes}</small>}</div><strong>{money.format(item.quantity * item.unitPrice)}</strong></div>)}</div>
+          <div className="mt-4 flex justify-between border-t-2 border-slate-900 pt-4 text-xl"><b>Total</b><strong>{money.format(orderTotal(selectedSale))}</strong></div>
+        </section>
+      </div>}
     </div>
   );
 }
