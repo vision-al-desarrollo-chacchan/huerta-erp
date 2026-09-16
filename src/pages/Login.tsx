@@ -1,7 +1,7 @@
 import '../styles/login.css';
 import logo from '../assets/logo-white.svg';
 import { useState } from 'react';
-import { Eye, EyeOff, LockKeyhole, Mail, TicketCheck, UserRound } from 'lucide-react';
+import { CircleCheck, Eye, EyeOff, LockKeyhole, Mail, TicketCheck, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { login, prepareLoggedInAccess, register } from '../services/auth';
 import { acceptInvitation } from '../services/erp-store';
@@ -61,10 +61,10 @@ export default function Login() {
         <img src={logo} alt="Huerta Digital" className="login-brand-logo" />
         <h1>HUERTA ERP</h1>
         <p>Administra tu empresa desde cualquier lugar.</p>
-        <ul>
-          <li>✓ Multiempresa</li>
-          <li>✓ Seguro en la nube</li>
-          <li>✓ Rápido y moderno</li>
+        <ul className="brand-benefits">
+          <li><span className="brand-benefit-icon"><CircleCheck aria-hidden="true" /></span><span>Multiempresa</span></li>
+          <li><span className="brand-benefit-icon"><CircleCheck aria-hidden="true" /></span><span>Seguro en la nube</span></li>
+          <li><span className="brand-benefit-icon"><CircleCheck aria-hidden="true" /></span><span>Control en tiempo real</span></li>
         </ul>
       </div>
     </section>
