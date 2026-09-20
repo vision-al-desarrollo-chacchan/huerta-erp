@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Banknote, ChefHat, CircleDollarSign, Clock3, Package, ShoppingBag } from 'lucide-react';
+import { AlertTriangle, Banknote, CalendarDays, ChefHat, CircleDollarSign, Clock3, Package, ShoppingBag, Store } from 'lucide-react';
 import { getCashSession, getCashSessionSales, getOrders, getProducts, orderTotal, subscribeRestaurantData, type CashSessionSale } from '../services/restaurant-store';
 import type { RestaurantOrder, RestaurantProduct } from '../types/restaurant';
 
@@ -68,15 +68,21 @@ export default function Dashboard() {
   const highestDailySale = Math.max(...salesByDay.map((day) => day.total), 1);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 dark:bg-slate-950 lg:p-6">
+    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 lg:p-6">
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
-      <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row md:items-end"><div><p className="text-sm font-bold text-blue-600">OPERACIÓN DE HOY</p><h1 className="text-3xl font-black text-slate-900 dark:text-white">Chicken Huerta</h1><p className="text-sm text-slate-500">Resumen de ventas, pedidos y cocina</p></div><span className={`w-fit rounded-full px-4 py-2 text-sm font-bold ${cashOpen ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>Caja {cashOpen ? 'abierta' : 'cerrada'}</span></div>
+      <div className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+        <div><p className="text-lg font-bold text-slate-700 dark:text-slate-200">¡Hola! 👋</p><h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">Chicken Huerta</h1><p className="text-sm font-medium text-slate-500">Resumen de ventas, pedidos y cocina en tiempo real</p></div>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"><CalendarDays className="h-5 w-5 text-blue-600"/><div><p className="text-xs font-bold text-slate-400">HOY</p><p className="text-sm font-bold text-slate-700 dark:text-slate-100">{new Intl.DateTimeFormat('es-PE',{weekday:'long',day:'2-digit',month:'long'}).format(new Date())}</p></div></div>
+          <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm ${cashOpen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-red-300 bg-red-50 text-red-700'}`}><Store className="h-5 w-5"/><div><p className="text-xs font-black uppercase">Caja {cashOpen ? 'abierta' : 'cerrada'}</p><p className="text-xs opacity-75">Estado de operación</p></div></div>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric icon={<CircleDollarSign />} label="Ventas de hoy" value={money.format(sales)} color="blue" />
-        <Metric icon={<ShoppingBag />} label="Pedidos cobrados" value={String(paid.length)} color="emerald" />
-        <Metric icon={<Banknote />} label="Ticket promedio" value={money.format(average)} color="violet" />
-        <Metric icon={<ChefHat />} label="En cocina" value={String(active.length)} color="orange" />
-        <Metric icon={<Package />} label="Stock crítico" value={String(lowStock)} color="red" />
+        <Metric icon={<CircleDollarSign />} label="Ventas de hoy" value={money.format(sales)} color="blue" note="Total cobrado hoy" />
+        <Metric icon={<ShoppingBag />} label="Pedidos cobrados" value={String(paid.length)} color="emerald" note="Pedidos completados" />
+        <Metric icon={<Banknote />} label="Ticket promedio" value={money.format(average)} color="violet" note="Promedio por pedido" />
+        <Metric icon={<ChefHat />} label="En cocina" value={String(active.length)} color="orange" note={active.length ? "Pedidos activos" : "Sin pedidos"} />
+        <Metric icon={<Package />} label="Stock crítico" value={String(lowStock)} color="red" note={lowStock ? "Requiere atención" : "Stock saludable"} />
       </div>
 
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -115,15 +121,16 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_1fr_0.9fr]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-slate-900 dark:text-white">Pedidos recientes</h2><span className="text-xs text-slate-400">Actualización automática</span></div><div className="space-y-2">{todayOrders.slice(0, 8).map((order) => <div key={order.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-800"><div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-sm font-black dark:bg-slate-800 dark:text-white">#{order.number}</div><div><p className="text-sm font-semibold text-slate-800 dark:text-white">{order.table ?? order.serviceType}</p><p className="flex items-center gap-1 text-xs capitalize text-slate-400"><Clock3 className="h-3 w-3" />{order.status}</p></div><strong className="dark:text-white">{money.format(orderTotal(order))}</strong></div>)}{!todayOrders.length && <p className="py-14 text-center text-sm text-slate-400">Todavía no hay pedidos registrados hoy.</p>}</div></section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 font-bold text-slate-900 dark:text-white">Productos más vendidos</h2><div className="space-y-3">{ranking.map(([name, quantity], index) => <div key={name} className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 dark:bg-blue-950">{index + 1}</span><span className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">{name}</span><strong className="text-sm dark:text-white">{quantity} und.</strong></div>)}{!ranking.length && <p className="py-14 text-center text-sm text-slate-400">El ranking aparecerá al cobrar ventas.</p>}</div></section>
+        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm dark:border-red-950 dark:bg-slate-900"><div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-5 w-5 text-red-500"/>Stock crítico</h2><span className="rounded-full bg-red-50 px-2 py-1 text-xs font-black text-red-600">{lowStock}</span></div><div className="space-y-2">{products.filter((product)=>product.stock<=5).slice(0,5).map((product)=><div key={product.id} className="flex items-center justify-between rounded-xl bg-red-50/70 px-3 py-3 dark:bg-red-950/20"><span className="truncate pr-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{product.name}</span><strong className="whitespace-nowrap text-xs text-red-600">{product.stock} und.</strong></div>)}{!lowStock && <p className="py-14 text-center text-sm text-slate-400">No hay productos con stock crítico.</p>}</div></section>
       </div>
     </div>
   );
 }
 
-function Metric({ icon, label, value, color }: { icon: ReactNode; label: string; value: string; color: string }) {
+function Metric({ icon, label, value, color, note }: { icon: ReactNode; label: string; value: string; color: string; note?: string }) {
   const colors: Record<string, string> = { blue: 'bg-blue-100 text-blue-600', emerald: 'bg-emerald-100 text-emerald-600', violet: 'bg-violet-100 text-violet-600', orange: 'bg-orange-100 text-orange-600', red: 'bg-red-100 text-red-600' };
-  return <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ${colors[color]}`}>{icon}</div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p><strong className="mt-1 block text-2xl text-slate-900 dark:text-white">{value}</strong></div>;
+  return <div className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"><div className="flex items-start justify-between"><div className={`mb-4 grid h-11 w-11 place-items-center rounded-xl ${colors[color]}`}>{icon}</div><span className="text-lg text-slate-300">⋮</span></div><p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p><strong className="mt-1 block text-2xl text-slate-950 dark:text-white">{value}</strong>{note && <p className="mt-3 text-xs font-semibold text-slate-500">{note}</p>}</div>;
 }
