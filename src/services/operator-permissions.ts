@@ -7,7 +7,7 @@ const permissions: Record<Role, string[]> = {
   mozo: ['/ventas/pos', '/ventas/pedidos', '/clientes', '/calendario'],
   moza_cajera: ['/dashboard', '/ventas/pos', '/ventas/pedidos', '/ventas/facturacion', '/clientes', '/caja', '/calendario'],
   cocina: ['/cocina', '/produccion', '/calendario'],
-  supervisor: ['/dashboard', '/ventas', '/cocina', '/impresion', '/compras', '/inventario', '/productos', '/clientes', '/proveedores', '/caja', '/produccion', '/calendario', '/documentos', '/reportes'],
+  supervisor: ['/dashboard', '/ventas', '/cocina', '/impresion', '/compras', '/inventario', '/productos', '/clientes', '/proveedores', '/caja', '/arqueo', '/produccion', '/calendario', '/documentos', '/reportes'],
 };
 
 const home: Record<Role, string> = {
