@@ -20,6 +20,7 @@ const Inventario = lazy(() => import("../pages/Inventario"));
 const Clientes = lazy(() => import("../pages/Clientes"));
 const Proveedores = lazy(() => import("../pages/Proveedores"));
 const Caja = lazy(() => import("../pages/Caja"));
+const Arqueo = lazy(() => import("../pages/Arqueo"));
 const Reportes = lazy(() => import("../pages/Reportes"));
 const Usuarios = lazy(() => import("../pages/Usuarios"));
 const Configuracion = lazy(() => import("../pages/Configuracion"));
@@ -65,6 +66,7 @@ export default function AppRoutes() {
           <Route path="/proveedores" element={<Proveedores />} />
 
           <Route path="/caja" element={<Caja />} />
+          <Route path="/arqueo" element={<Arqueo />} />
 
           <Route path="/reportes" element={<Reportes />} />
 

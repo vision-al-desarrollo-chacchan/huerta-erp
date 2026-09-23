@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Truck, Wallet, Calculator,
   UserCheck, Factory, Wrench, Rocket, Calendar, Folder, FileText, Bot,
-  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight, X, Printer,
+  Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight, X, Printer, ClipboardCheck,
 } from 'lucide-react';
 import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
 import { canOperatorRolesAccess } from '../services/operator-permissions';
@@ -65,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
       {allowed('/impresion') && <NavLink to="/impresion" className={link}><Printer className="h-5 w-5" /> Impresión 80 mm</NavLink>}
       {allowed('/compras') && <NavLink to="/compras" className={link}><Truck className="h-5 w-5" /> Compras & Prov.</NavLink>}
       {allowed('/caja') && <NavLink to="/caja" className={link}><Wallet className="h-5 w-5" /> Caja & Bancos</NavLink>}
+      {allowed('/arqueo') && <NavLink to="/arqueo" className={link}><ClipboardCheck className="h-5 w-5" /> Arqueo</NavLink>}
       {allowed('/contabilidad') && <NavLink to="/contabilidad" className={link}><Calculator className="h-5 w-5" /> Contabilidad</NavLink>}
       {allowed('/recursos-humanos') && <NavLink to="/recursos-humanos" className={link}><UserCheck className="h-5 w-5" /> Recursos Humanos</NavLink>}
       {allowed('/produccion') && <NavLink to="/produccion" className={link}><Factory className="h-5 w-5" /> Producción</NavLink>}
