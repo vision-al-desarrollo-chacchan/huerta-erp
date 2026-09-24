@@ -86,10 +86,23 @@ export default function Arqueo() {
   const report = salesOnlyMode
     ? `HUERTA ERP · CIERRE DE TURNO\nTurno: ${audit ? new Date(audit.iniciado_at).toLocaleString('es-PE') : ''}\nResponsable: ${audit?.responsable ?? ''}\n\nRESUMEN DE VENTAS\n${salesReport}\n\nTotal de platos/productos: ${amount(salesUnits)}\nTotal vendido: ${money(salesTotal)}`
     : `HUERTA ERP · CIERRE DE TURNO\nTurno: ${audit ? new Date(audit.iniciado_at).toLocaleString('es-PE') : ''}\nResponsable: ${audit?.responsable ?? ''}\n\nRESUMEN DE VENTAS\n${salesReport}\n\nTotal de platos/productos: ${amount(salesUnits)}\nTotal vendido: ${money(salesTotal)}\n\nARQUEO DE INVENTARIO\n${lines.map(x => `${x.nombre}: inicial ${amount(x.stock_inicial)}, vendido ${amount(x.vendido)}, esperado ${amount(x.stock_esperado)}, físico ${counts[x.insumo_id] ?? 'pendiente'}, diferencia ${complete ? amount(Number(counts[x.insumo_id]) - x.stock_esperado) : 'pendiente'}`).join('\n')}\nFaltantes: ${missing.length} · Valor al costo: ${money(loss)}\nObservaciones: ${notes || 'Ninguna'}`;
+  function printableSalesHtml() {
+    const rows = salesSummary.map(item => `<tr><td>${item.name}</td><td style="text-align:center">${amount(item.quantity)}</td><td style="text-align:right">${money(item.total)}</td></tr>`).join('');
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Cierre Huerta ERP</title><style>body{font-family:Arial,sans-serif;color:#111;padding:28px}h1{font-size:22px;margin-bottom:4px}p{margin:4px 0 18px;color:#555}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}th{background:#f3f4f6}.totals{margin-top:20px;font-size:18px;font-weight:700}</style></head><body><h1>HUERTA ERP · CIERRE DE TURNO</h1><p>Turno: ${audit ? new Date(audit.iniciado_at).toLocaleString('es-PE') : ''} · Responsable: ${audit?.responsable ?? ''}</p><h2>Resumen de ventas</h2><table><thead><tr><th>Plato / producto</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows}</tbody></table><div class="totals">Total de platos/productos: ${amount(salesUnits)}<br>Total vendido: ${money(salesTotal)}</div></body></html>`;
+  }
+  function openPrint() {
+    const popup = window.open('', '_blank');
+    if (!popup) { alert('Permite ventanas emergentes para imprimir o guardar el PDF.'); return; }
+    popup.document.open(); popup.document.write(printableSalesHtml()); popup.document.close();
+    popup.onload = () => { popup.focus(); popup.print(); };
+  }
   async function share() {
-    if (navigator.share) { try { await navigator.share({ title: 'Arqueo Huerta ERP', text: report }); return; } catch { /* Compartir cancelado */ } }
-    await navigator.clipboard.writeText(report);
-    alert('Reporte copiado. Puedes pegarlo en WhatsApp.');
+    if (!salesOnlyMode) {
+      if (navigator.share) { try { await navigator.share({ title: 'Arqueo Huerta ERP', text: report }); return; } catch { return; } }
+      await navigator.clipboard.writeText(report); alert('Reporte copiado.'); return;
+    }
+    // En móvil, el diálogo de impresión permite Guardar como PDF; desde allí Android puede compartir el PDF por WhatsApp.
+    openPrint();
   }
   return <div className="space-y-5 p-4 text-slate-900 dark:text-white lg:p-6">
     <style>{`@media print { body * { visibility: hidden !important; } #sales-report, #sales-report *, #arqueo-report, #arqueo-report * { visibility: visible !important; } #sales-report, #arqueo-report { position: static !important; width: 100% !important; color: black !important; background: white !important; box-shadow: none !important; border-color: #ddd !important; } #arqueo-report input { border: 0 !important; } } @page { size: A4 portrait; margin: 12mm; }`}</style>
@@ -107,7 +120,7 @@ export default function Arqueo() {
       <div className="rounded-xl bg-amber-50 p-4 font-semibold text-amber-900">Productos con faltante: {missing.length} · Pérdida estimada al costo: {money(loss)}</div>
       {notes && <p className="rounded-xl border p-3"><b>Observaciones:</b> {notes}</p>}</div>}
       {!salesOnlyMode && <label className="block">Observaciones<textarea disabled={audit.estado === 'cerrado'} value={notes} onChange={e => setNotes(e.target.value)} className="mt-2 block min-h-20 w-full rounded-xl border p-3 text-slate-900" placeholder="Motivo de las diferencias, mermas o incidencias" /></label>}
-      <div className="flex flex-wrap gap-3">{!salesOnlyMode && audit.estado === 'abierto' && <button disabled={busy || !complete || !cashId || audit.caja_id !== cashId} onClick={() => void close()} className="rounded-xl bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">Cerrar arqueo</button>}<button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => void share().catch(e => setError(String(e.message ?? e)))} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50">Compartir reporte</button><button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => window.print()} className="rounded-xl border px-5 py-3 font-bold">Imprimir / PDF</button></div></>}
+      <div className="flex flex-wrap gap-3">{!salesOnlyMode && audit.estado === 'abierto' && <button disabled={busy || !complete || !cashId || audit.caja_id !== cashId} onClick={() => void close()} className="rounded-xl bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">Cerrar arqueo</button>}<button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => void share().catch(e => setError(String(e.message ?? e)))} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50">Compartir / PDF</button><button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => salesOnlyMode ? openPrint() : window.print()} className="rounded-xl border px-5 py-3 font-bold">Imprimir / PDF</button></div></>}
     </>}
   </div>;
 }
