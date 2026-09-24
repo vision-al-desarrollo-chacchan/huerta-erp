@@ -77,7 +77,12 @@ export default function Arqueo() {
   const missing = lines.filter(x => (Number(counts[x.insumo_id]) - x.stock_esperado) < -0.0001);
   const loss = missing.reduce((sum, x) => sum + (x.stock_esperado - Number(counts[x.insumo_id])) * x.costo_unitario, 0);
   const complete = lines.every(x => counts[x.insumo_id] !== undefined && counts[x.insumo_id].trim() !== '' && Number.isFinite(Number(counts[x.insumo_id])) && Number(counts[x.insumo_id]) >= 0);
-  const report = `HUERTA ERP · ARQUEO DE INVENTARIO\nTurno: ${audit ? new Date(audit.iniciado_at).toLocaleString('es-PE') : ''}\nResponsable: ${audit?.responsable ?? ''}\n${lines.map(x => `${x.nombre}: inicial ${amount(x.stock_inicial)}, vendido ${amount(x.vendido)}, esperado ${amount(x.stock_esperado)}, físico ${counts[x.insumo_id] ?? 'pendiente'}, diferencia ${complete ? amount(Number(counts[x.insumo_id]) - x.stock_esperado) : 'pendiente'}`).join('\n')}\nFaltantes: ${missing.length} · Valor al costo: ${money(loss)}\nObservaciones: ${notes || 'Ninguna'}`;
+  const salesUnits = salesSummary.reduce((sum, item) => sum + item.quantity, 0);
+  const salesTotal = salesSummary.reduce((sum, item) => sum + item.total, 0);
+  const salesReport = salesSummary.length
+    ? salesSummary.map(item => `• ${item.name}: ${amount(item.quantity)} vendido${item.quantity === 1 ? '' : 's'} · ${money(item.total)}`).join('\n')
+    : 'Sin ventas pagadas registradas en este turno.';
+  const report = `HUERTA ERP · CIERRE DE TURNO\nTurno: ${audit ? new Date(audit.iniciado_at).toLocaleString('es-PE') : ''}\nResponsable: ${audit?.responsable ?? ''}\n\nRESUMEN DE VENTAS\n${salesReport}\n\nTotal de platos/productos: ${amount(salesUnits)}\nTotal vendido: ${money(salesTotal)}\n\nARQUEO DE INVENTARIO\n${lines.map(x => `${x.nombre}: inicial ${amount(x.stock_inicial)}, vendido ${amount(x.vendido)}, esperado ${amount(x.stock_esperado)}, físico ${counts[x.insumo_id] ?? 'pendiente'}, diferencia ${complete ? amount(Number(counts[x.insumo_id]) - x.stock_esperado) : 'pendiente'}`).join('\n')}\nFaltantes: ${missing.length} · Valor al costo: ${money(loss)}\nObservaciones: ${notes || 'Ninguna'}`;
   async function share() {
     if (navigator.share) { try { await navigator.share({ title: 'Arqueo Huerta ERP', text: report }); return; } catch { /* Compartir cancelado */ } }
     await navigator.clipboard.writeText(report);
