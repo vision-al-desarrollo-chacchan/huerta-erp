@@ -6,11 +6,14 @@ import {
   Shield, Settings, HelpCircle, ChefHat, ChevronDown, ChevronRight, X, Printer, ClipboardCheck,
 } from 'lucide-react';
 import { getActiveOperator, type ActiveOperator } from '../services/operator-session';
+import { isSuperadmin } from '../services/platform';
 import { canOperatorRolesAccess } from '../services/operator-permissions';
 
 type SidebarProps = { open?: boolean; onClose?: () => void };
 
 const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
+  const [platformAdmin, setPlatformAdmin] = useState(false);
+  useEffect(() => { let active = true; isSuperadmin().then(value => { if (active) setPlatformAdmin(value); }).catch(() => {}); return () => { active = false; }; }, []);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({ ventas: true, productos: false });
   const [operator, setOperator] = useState<ActiveOperator | null>(getActiveOperator());
 
@@ -78,6 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
       {!operator && <NavLink to="/centro-ia" className={({ isActive }) => `${link({ isActive })} justify-between`}><div className="flex items-center gap-3"><Bot className="h-5 w-5" /> Centro IA</div><span className="rounded bg-brand-blue px-1.5 py-0.5 text-[10px] font-bold text-white">BETA</span></NavLink>}
 
       {!operator && <><div className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Sistema</div>
+        {platformAdmin && <NavLink to="/superadmin" className={link}><Shield className="h-5 w-5" /> Superadministrador</NavLink>}
         <NavLink to="/usuarios" className={link}><Shield className="h-5 w-5" /> Usuarios y Roles</NavLink>
         <NavLink to="/configuracion" className={link}><Settings className="h-5 w-5" /> Configuración</NavLink>
         <NavLink to="/ayuda" className={link}><HelpCircle className="h-5 w-5" /> Ayuda</NavLink>

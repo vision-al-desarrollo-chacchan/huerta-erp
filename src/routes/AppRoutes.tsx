@@ -4,8 +4,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import GuestRoute from "./GuestRoute";
 import ProtectedRoute from "./ProtectedRoute";
+import SuperadminRoute from "./SuperadminRoute";
 import OperatorRoute from "./OperatorRoute";
 
+const Superadmin = lazy(() => import("../pages/Superadmin"));
+const PendingCompany = lazy(() => import("../pages/PendingCompany"));
 const Login = lazy(() => import("../pages/Login"));
 const Demo = lazy(() => import("../pages/Demo"));
 const Dashboard = lazy(() => import("../pages/Dashboard"));
@@ -43,6 +46,8 @@ export default function AppRoutes() {
         <Route path="/demo" element={<Demo />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route element={<SuperadminRoute />}><Route path="/superadmin" element={<Superadmin />} /></Route>
+          <Route path="/acceso-pendiente" element={<PendingCompany />} />
           <Route element={<OperatorRoute><DashboardLayout /></OperatorRoute>}>
 
           <Route path="/dashboard" element={<Dashboard />} />

@@ -35,16 +35,17 @@ export default function Login() {
   }
 
   async function handleRegister() {
-    if (!name.trim() || password.length < 6 || !invite.trim()) {
-      setMessage('Completa tu nombre, el código y una contraseña de mínimo 6 caracteres.');
+    if (!name.trim() || password.length < 8) {
+      setMessage('Completa tu nombre y una contraseña de mínimo 8 caracteres.');
       return;
     }
-    localStorage.setItem('huerta-invite', invite.trim());
+    if (invite.trim()) localStorage.setItem('huerta-invite', invite.trim());
+    else localStorage.removeItem('huerta-invite');
     const { data, error } = await register(email, password, name);
     if (error) return setMessage(error.message);
     if (data.session) {
       try {
-        await acceptInvitation(invite.trim());
+        if (invite.trim()) await acceptInvitation(invite.trim());
         localStorage.removeItem('huerta-invite');
         navigate(await prepareLoggedInAccess());
       } catch (reason) {
@@ -73,12 +74,12 @@ export default function Login() {
       <div className="login-card">
         <header>
           <h2>{registerMode ? '¡Crea tu acceso!' : '¡Bienvenido!'}</h2>
-          <p>{registerMode ? 'Usa la invitación entregada por tu administrador' : 'Ingresa tus credenciales para continuar'}</p>
+          <p>{registerMode ? 'Crea tu cuenta. Huerta ERP asignará tu empresa.' : 'Ingresa tus credenciales para continuar'}</p>
         </header>
 
         {registerMode && <label className="login-field">
           <span>Nombre completo</span>
-          <div><UserRound aria-hidden="true" /><input autoComplete="name" placeholder="Nombre del trabajador" value={name} onChange={(event) => setName(event.target.value)} /></div>
+          <div><UserRound aria-hidden="true" /><input autoComplete="name" placeholder="Tu nombre completo" value={name} onChange={(event) => setName(event.target.value)} /></div>
         </label>}
 
         <label className="login-field">
@@ -87,7 +88,7 @@ export default function Login() {
         </label>
 
         {registerMode && <label className="login-field">
-          <span>Código de invitación</span>
+          <span>Código de invitación (opcional para dueños)</span>
           <div><TicketCheck aria-hidden="true" /><input autoComplete="off" placeholder="Código entregado por el administrador" value={invite} onChange={(event) => setInvite(event.target.value)} /></div>
         </label>}
 
@@ -108,7 +109,7 @@ export default function Login() {
         </button>
 
         <button type="button" className="invite-link" onClick={() => { setRegisterMode((active) => !active); setMessage(''); }}>
-          {registerMode ? 'Ya tengo una cuenta' : 'Tengo un código de invitación'}
+          {registerMode ? 'Ya tengo una cuenta' : 'Crear mi cuenta'}
         </button>
 
         {!registerMode && <button type="button" className="invite-link" onClick={() => navigate('/demo')}>Ver demostración gratuita</button>}

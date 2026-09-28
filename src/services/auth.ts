@@ -1,3 +1,4 @@
+import { isSuperadmin } from "./platform";
 import { supabase } from "../lib/supabase";
 import { clearActiveOperator, setActiveOperator, type ActiveOperator } from './operator-session';
 import { operatorRolesHome } from './operator-permissions';
@@ -12,9 +13,10 @@ export async function login(email: string, password: string) {
 export async function prepareLoggedInAccess() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Sesión no encontrada.');
+  if (await isSuperadmin()) { clearActiveOperator(); return '/superadmin'; }
   const { data, error } = await supabase.from('rest_miembros').select('user_id,nombre,rol,roles,activo').eq('user_id', user.id).limit(1).maybeSingle();
   if (error) throw error;
-  if (!data) { clearActiveOperator(); return '/dashboard'; }
+  if (!data) { clearActiveOperator(); return '/acceso-pendiente'; }
   if (!data.activo) { await supabase.auth.signOut(); throw new Error('Tu acceso fue desactivado. Comunícate con el administrador.'); }
   const memberRoles = (data.roles?.length ? data.roles : [data.rol]) as string[];
   if (memberRoles.includes('propietario') || memberRoles.includes('administrador')) { clearActiveOperator(); return '/dashboard'; }

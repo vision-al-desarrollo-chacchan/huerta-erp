@@ -28,8 +28,12 @@ Deno.serve(async (request) => {
       if (memberError) { await admin.auth.admin.deleteUser(targetId); throw memberError; }
     } else {
       if (!targetId) throw new Error('Trabajador no encontrado.');
-      const { data: member } = await admin.from('rest_miembros').select('rol').eq('empresa_id',body.empresaId).eq('user_id',targetId).single();
-      if (member?.rol === 'propietario') throw new Error('La cuenta del propietario no se puede modificar.');
+      const { data: member } = await admin.from('rest_miembros').select('rol,roles').eq('empresa_id',body.empresaId).eq('user_id',targetId).single();
+      if (!member) throw new Error('El trabajador no pertenece a esta empresa.');
+      const { data: protectedAccount, error: protectionError } = await anon.rpc('platform_is_protected_account', { p_user_id: targetId });
+      if (protectionError) throw protectionError;
+      if (protectedAccount) throw new Error('La cuenta del superadministrador no se puede modificar desde una empresa.');
+      if (member.rol === 'propietario' || member.roles?.includes('propietario')) throw new Error('La cuenta del propietario no se puede modificar.');
       if (body.action === 'password') { if ((body.password?.length ?? 0)<8) throw new Error('La contraseña debe tener al menos 8 caracteres.'); const { error }=await admin.auth.admin.updateUserById(targetId,{password:body.password}); if(error)throw error; }
       else if (body.action === 'active') { const { error }=await admin.from('rest_miembros').update({activo:Boolean(body.active)}).eq('empresa_id',body.empresaId).eq('user_id',targetId); if(error)throw error; }
       else if (body.action === 'roles') { if(!roles.length)throw new Error('Selecciona por lo menos un rol.'); const { error }=await admin.from('rest_miembros').update({rol:roles[0],roles}).eq('empresa_id',body.empresaId).eq('user_id',targetId); if(error)throw error; }

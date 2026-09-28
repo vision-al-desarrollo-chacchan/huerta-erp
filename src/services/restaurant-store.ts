@@ -5,6 +5,12 @@ import type { CashMovement, CashSession, OrderItem, OrderStatus, RestaurantOrder
 type BusinessContext = { empresaId: string; sucursalId: string };
 let cachedContext: BusinessContext | null = null;
 let cachedCash: CashSession | null | undefined;
+let contextUserId: string | undefined;
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (session?.user.id !== contextUserId) {
+    cachedContext = null; cachedCash = undefined; contextUserId = session?.user.id;
+  }
+});
 
 async function context(): Promise<BusinessContext> {
   if (cachedContext) return cachedContext;
