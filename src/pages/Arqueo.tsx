@@ -99,7 +99,7 @@ export default function Arqueo() {
   function createSalesPdfFile() {
     const safe = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '').replace(/([\\()])/g, '\\$1');
     const date = audit ? new Date(audit.iniciado_at) : new Date();
-    const fileName = `Cierre_Turno_${date.toLocaleDateString('es-PE').replace(/\\//g, '-')}.pdf`;
+    const fileName = `Cierre_Turno_${date.toLocaleDateString('es-PE').split('/').join('-')}.pdf`;
     const lines: Array<{ text: string; size?: number; bold?: boolean }> = [
       { text: 'HUERTA ERP - CIERRE DE TURNO', size: 16, bold: true },
       { text: `Turno: ${audit ? date.toLocaleString('es-PE') : ''}   Responsable: ${audit?.responsable ?? ''}`, size: 9 },
@@ -114,31 +114,31 @@ export default function Arqueo() {
       { text: `Total de platos/productos: ${amount(salesUnits)}`, size: 11, bold: true },
       { text: `Total vendido: ${money(salesTotal)}`, size: 11, bold: true },
     ];
-    let stream = 'BT\\n50 790 Td\\n';
+    let stream = 'BT\n40 750 Td\n';
     let currentSize = 10;
     lines.forEach((line, index) => {
       const size = line.size ?? 10;
-      if (size !== currentSize || index === 0) { stream += `/F${line.bold ? 2 : 1} ${size} Tf\\n`; currentSize = size; }
-      else stream += `/F${line.bold ? 2 : 1} ${size} Tf\\n`;
-      if (index > 0) stream += `0 -${size + 6} Td\\n`;
-      stream += `(${safe(line.text)}) Tj\\n`;
+      if (size !== currentSize || index === 0) { stream += `/F${line.bold ? 2 : 1} ${size} Tf\n`; currentSize = size; }
+      else stream += `/F${line.bold ? 2 : 1} ${size} Tf\n`;
+      if (index > 0) stream += `0 -${size + 6} Td\n`;
+      stream += `(${safe(line.text)}) Tj\n`;
     });
     stream += 'ET';
     const objects = [
       '<< /Type /Catalog /Pages 2 0 R >>',
       '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
       '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>',
-      `<< /Length ${stream.length} >>\\nstream\\n${stream}\\nendstream`,
-      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>',
     ];
-    let pdf = '%PDF-1.4\\n';
+    let pdf = '%PDF-1.4\n';
     const offsets = [0];
-    objects.forEach((obj, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\\n${obj}\\nendobj\\n`; });
+    objects.forEach((obj, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${obj}\nendobj\n`; });
     const xref = pdf.length;
-    pdf += `xref\\n0 ${objects.length + 1}\\n0000000000 65535 f \\n`;
-    offsets.slice(1).forEach(offset => { pdf += `${String(offset).padStart(10, '0')} 00000 n \\n`; });
-    pdf += `trailer\\n<< /Size ${objects.length + 1} /Root 1 0 R >>\\nstartxref\\n${xref}\\n%%EOF`;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    offsets.slice(1).forEach(offset => { pdf += `${String(offset).padStart(10, '0')} 00000 n \n`; });
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
     return new File([new TextEncoder().encode(pdf)], fileName, { type: 'application/pdf' });
   }
   async function share() {
@@ -157,8 +157,8 @@ export default function Arqueo() {
     }
     const url = URL.createObjectURL(pdf);
     const link = document.createElement('a');
-    link.href = url; link.download = pdf.name; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    link.href = url; link.download = pdf.name; document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
     alert('Tu dispositivo no permite compartir el PDF directamente. Se descargó el archivo para que puedas enviarlo por WhatsApp.');
   }
   return <div className="space-y-5 p-4 text-slate-900 dark:text-white lg:p-6">
@@ -177,7 +177,7 @@ export default function Arqueo() {
       <div className="rounded-xl bg-amber-50 p-4 font-semibold text-amber-900">Productos con faltante: {missing.length} · Pérdida estimada al costo: {money(loss)}</div>
       {notes && <p className="rounded-xl border p-3"><b>Observaciones:</b> {notes}</p>}</div>}
       {!salesOnlyMode && <label className="block">Observaciones<textarea disabled={audit.estado === 'cerrado'} value={notes} onChange={e => setNotes(e.target.value)} className="mt-2 block min-h-20 w-full rounded-xl border p-3 text-slate-900" placeholder="Motivo de las diferencias, mermas o incidencias" /></label>}
-      <div className="flex flex-wrap gap-3">{!salesOnlyMode && audit.estado === 'abierto' && <button disabled={busy || !complete || !cashId || audit.caja_id !== cashId} onClick={() => void close()} className="rounded-xl bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">Cerrar arqueo</button>}<button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => void share().catch(e => setError(String(e.message ?? e)))} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50">Compartir / PDF</button><button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => salesOnlyMode ? openPrint() : window.print()} className="rounded-xl border px-5 py-3 font-bold">Imprimir / PDF</button></div></>}
+      <div className="flex flex-wrap gap-3">{!salesOnlyMode && audit.estado === 'abierto' && <button disabled={busy || !complete || !cashId || audit.caja_id !== cashId} onClick={() => void close()} className="rounded-xl bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">Cerrar arqueo</button>}<button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => void share().catch(e => setError(String(e.message ?? e)))} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50">Compartir PDF</button><button disabled={salesOnlyMode ? salesSummary.length === 0 : !complete} onClick={() => salesOnlyMode ? openPrint() : window.print()} className="rounded-xl border px-5 py-3 font-bold">Imprimir</button></div></>}
     </>}
   </div>;
 }
