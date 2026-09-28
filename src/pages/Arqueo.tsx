@@ -96,13 +96,70 @@ export default function Arqueo() {
     popup.document.open(); popup.document.write(printableSalesHtml()); popup.document.close();
     popup.onload = () => { popup.focus(); popup.print(); };
   }
+  function createSalesPdfFile() {
+    const safe = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '').replace(/([\\()])/g, '\\$1');
+    const date = audit ? new Date(audit.iniciado_at) : new Date();
+    const fileName = `Cierre_Turno_${date.toLocaleDateString('es-PE').replace(/\\//g, '-')}.pdf`;
+    const lines: Array<{ text: string; size?: number; bold?: boolean }> = [
+      { text: 'HUERTA ERP - CIERRE DE TURNO', size: 16, bold: true },
+      { text: `Turno: ${audit ? date.toLocaleString('es-PE') : ''}   Responsable: ${audit?.responsable ?? ''}`, size: 9 },
+      { text: '', size: 8 },
+      { text: 'Resumen de Ventas', size: 13, bold: true },
+      { text: 'Plato / producto                              Cantidad          Total', size: 9, bold: true },
+      ...salesSummary.map(item => {
+        const name = item.name.length > 38 ? item.name.slice(0, 35) + '...' : item.name;
+        return { text: `${name.padEnd(45)}${amount(item.quantity).padStart(8)}${money(item.total).padStart(18)}`, size: 9 };
+      }),
+      { text: '', size: 8 },
+      { text: `Total de platos/productos: ${amount(salesUnits)}`, size: 11, bold: true },
+      { text: `Total vendido: ${money(salesTotal)}`, size: 11, bold: true },
+    ];
+    let stream = 'BT\\n50 790 Td\\n';
+    let currentSize = 10;
+    lines.forEach((line, index) => {
+      const size = line.size ?? 10;
+      if (size !== currentSize || index === 0) { stream += `/F${line.bold ? 2 : 1} ${size} Tf\\n`; currentSize = size; }
+      else stream += `/F${line.bold ? 2 : 1} ${size} Tf\\n`;
+      if (index > 0) stream += `0 -${size + 6} Td\\n`;
+      stream += `(${safe(line.text)}) Tj\\n`;
+    });
+    stream += 'ET';
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>',
+      `<< /Length ${stream.length} >>\\nstream\\n${stream}\\nendstream`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+    ];
+    let pdf = '%PDF-1.4\\n';
+    const offsets = [0];
+    objects.forEach((obj, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\\n${obj}\\nendobj\\n`; });
+    const xref = pdf.length;
+    pdf += `xref\\n0 ${objects.length + 1}\\n0000000000 65535 f \\n`;
+    offsets.slice(1).forEach(offset => { pdf += `${String(offset).padStart(10, '0')} 00000 n \\n`; });
+    pdf += `trailer\\n<< /Size ${objects.length + 1} /Root 1 0 R >>\\nstartxref\\n${xref}\\n%%EOF`;
+    return new File([new TextEncoder().encode(pdf)], fileName, { type: 'application/pdf' });
+  }
   async function share() {
     if (!salesOnlyMode) {
       if (navigator.share) { try { await navigator.share({ title: 'Arqueo Huerta ERP', text: report }); return; } catch { return; } }
       await navigator.clipboard.writeText(report); alert('Reporte copiado.'); return;
     }
-    // En móvil, el diálogo de impresión permite Guardar como PDF; desde allí Android puede compartir el PDF por WhatsApp.
-    openPrint();
+    const pdf = createSalesPdfFile();
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [pdf] }))) {
+      try {
+        await navigator.share({ title: 'Cierre de turno Huerta ERP', text: 'Resumen de ventas del turno', files: [pdf] });
+        return;
+      } catch (error) {
+        if ((error as DOMException)?.name === 'AbortError') return;
+      }
+    }
+    const url = URL.createObjectURL(pdf);
+    const link = document.createElement('a');
+    link.href = url; link.download = pdf.name; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    alert('Tu dispositivo no permite compartir el PDF directamente. Se descargó el archivo para que puedas enviarlo por WhatsApp.');
   }
   return <div className="space-y-5 p-4 text-slate-900 dark:text-white lg:p-6">
     <style>{`@media print { body * { visibility: hidden !important; } #sales-report, #sales-report *, #arqueo-report, #arqueo-report * { visibility: visible !important; } #sales-report, #arqueo-report { position: static !important; width: 100% !important; color: black !important; background: white !important; box-shadow: none !important; border-color: #ddd !important; } #arqueo-report input { border: 0 !important; } } @page { size: A4 portrait; margin: 12mm; }`}</style>
