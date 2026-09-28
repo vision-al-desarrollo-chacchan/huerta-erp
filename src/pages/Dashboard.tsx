@@ -2,15 +2,34 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, Banknote, CalendarDays, ChefHat, CircleDollarSign, Clock3, Package, ShoppingBag, Store } from 'lucide-react';
 import { getCashSession, getCashSessionSales, getOrders, getProducts, orderTotal, subscribeRestaurantData, type CashSessionSale } from '../services/restaurant-store';
 import type { RestaurantOrder, RestaurantProduct } from '../types/restaurant';
+import { getCompanySettings } from '../services/erp-store';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
 export default function Dashboard() {
+  const [companyName, setCompanyName] = useState('');
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [cashOpen, setCashOpen] = useState(false);
   const [products, setProducts] = useState<RestaurantProduct[]>([]);
   const [cashSessionSales, setCashSessionSales] = useState<CashSessionSale[]>([]);
   const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    const loadCompany = async () => {
+      try {
+        const company = await getCompanySettings();
+        if (active) setCompanyName(company.nombreComercial || company.nombre);
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : 'No se pudo cargar el nombre del negocio.');
+      }
+    };
+    void loadCompany();
+    window.addEventListener('huerta-settings-updated', loadCompany);
+    return () => {
+      active = false;
+      window.removeEventListener('huerta-settings-updated', loadCompany);
+    };
+  }, []);
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     const load = async () => {
@@ -71,7 +90,7 @@ export default function Dashboard() {
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 lg:p-6">
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
       <div className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
-        <div><p className="text-lg font-bold text-slate-700 dark:text-slate-200">¡Hola! 👋</p><h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">Chicken Huerta</h1><p className="text-sm font-medium text-slate-500">Resumen de ventas, pedidos y cocina en tiempo real</p></div>
+        <div><p className="text-lg font-bold text-slate-700 dark:text-slate-200">¡Hola! 👋</p><h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">{companyName}</h1><p className="text-sm font-medium text-slate-500">Resumen de ventas, pedidos y cocina en tiempo real</p></div>
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"><CalendarDays className="h-5 w-5 text-blue-600"/><div><p className="text-xs font-bold text-slate-400">HOY</p><p className="text-sm font-bold text-slate-700 dark:text-slate-100">{new Intl.DateTimeFormat('es-PE',{weekday:'long',day:'2-digit',month:'long'}).format(new Date())}</p></div></div>
           <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm ${cashOpen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-red-300 bg-red-50 text-red-700'}`}><Store className="h-5 w-5"/><div><p className="text-xs font-black uppercase">Caja {cashOpen ? 'abierta' : 'cerrada'}</p><p className="text-xs opacity-75">Estado de operación</p></div></div>
