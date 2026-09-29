@@ -31,6 +31,24 @@ export async function savePlatformPlan(id: string, plan: string, date: string) {
   if (error) throw error;
 }
 
+export async function setPlatformCompanyActive(id: string, active: boolean) {
+  const { error } = await supabase.rpc('platform_set_company_active', { p_empresa_id: id, p_activa: active });
+  if (error) throw error;
+}
+
+export async function deletePlatformCompany(id: string, confirmation: string) {
+  const { error } = await supabase.rpc('platform_delete_company', { p_empresa_id: id, p_confirmation: confirmation });
+  if (error) throw error;
+}
+
+export type CompanyAccess = 'active' | 'suspended' | 'pending';
+export async function getCompanyAccess(): Promise<CompanyAccess> {
+  const { data, error } = await supabase.rpc('platform_company_access');
+  if (error) throw error;
+  if (data !== 'active' && data !== 'suspended' && data !== 'pending') throw new Error('No se pudo verificar el acceso a la empresa.');
+  return data;
+}
+
 export function platformError(error: unknown) {
   return error && typeof error === 'object' && 'message' in error ? String(error.message) : 'No se pudo completar la operación. Intenta nuevamente.';
 }

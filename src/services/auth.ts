@@ -1,4 +1,4 @@
-import { isSuperadmin } from "./platform";
+import { getCompanyAccess, isSuperadmin } from "./platform";
 import { supabase } from "../lib/supabase";
 import { clearActiveOperator, setActiveOperator, type ActiveOperator } from './operator-session';
 import { operatorRolesHome } from './operator-permissions';
@@ -14,6 +14,8 @@ export async function prepareLoggedInAccess() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Sesión no encontrada.');
   if (await isSuperadmin()) { clearActiveOperator(); return '/superadmin'; }
+  const access = await getCompanyAccess();
+  if (access !== 'active') { clearActiveOperator(); return '/acceso-pendiente'; }
   const { data, error } = await supabase.from('rest_miembros').select('user_id,nombre,rol,roles,activo').eq('user_id', user.id).limit(1).maybeSingle();
   if (error) throw error;
   if (!data) { clearActiveOperator(); return '/acceso-pendiente'; }
