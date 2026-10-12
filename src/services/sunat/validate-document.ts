@@ -30,7 +30,7 @@ export function validateSunatDraft(draft: SunatDocumentDraft): string[] {
   if (!new RegExp('^' + expectedPrefix + '[A-Z0-9]{3}$').test(draft.series)) {
     errors.push('La serie no corresponde al tipo de comprobante.');
   }
-  if (!Number.isSafeInteger(draft.number) || draft.number < 1) {
+  if (!Number.isSafeInteger(draft.number) || draft.number < 1 || draft.number > 99999999) {
     errors.push('El correlativo debe ser un entero positivo.');
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.issueDate) ||
@@ -53,13 +53,17 @@ export function validateSunatDraft(draft: SunatDocumentDraft): string[] {
   if (draft.receiverDocumentType === '0' && draft.receiverDocumentNumber.trim()) {
     errors.push('Sin documento no debe informarse número de documento.');
   }
+  if (draft.documentType === '01' && draft.receiverDocumentType === '0') {
+    errors.push('No se puede emitir factura a cliente sin documento.');
+  }
   if (!draft.items.length) errors.push('Debe existir al menos un producto.');
+  if (draft.items.length > 500) errors.push('Demasiados ítems para el generador preliminar.');
   draft.items.forEach((item, index) => {
     if (!item.description.trim()) errors.push('Falta descripción del ítem ' + (index + 1) + '.');
     if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
       errors.push('Cantidad inválida en el ítem ' + (index + 1) + '.');
     }
-    if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
+    if (!Number.isFinite(item.unitPrice) || item.unitPrice <= 0) {
       errors.push('Precio inválido en el ítem ' + (index + 1) + '.');
     }
   });
