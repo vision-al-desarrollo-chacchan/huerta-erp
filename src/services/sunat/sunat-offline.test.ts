@@ -1,3 +1,4 @@
+declare const Deno: { test(name: string, fn: () => void): void };
 /**
  * Pruebas SUNAT aisladas, sin credenciales ni llamadas de red.
  * Ejecutar desde la raíz del repositorio:
