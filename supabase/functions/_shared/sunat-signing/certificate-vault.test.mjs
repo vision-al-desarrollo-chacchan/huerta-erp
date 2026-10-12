@@ -16,7 +16,7 @@ test('cifra PFX y contraseña y permite firma con descifrado interno',async()=>{
  sealed=await sealSunatCertificate(input);
  assert.ok(!sealed.envelope.includes(password));assert.ok(!sealed.envelope.includes(input.pfxBase64));
  const metadata=await inspectStoredSunatCertificate({...input,envelope:sealed.envelope});assert.equal(metadata.fingerprint256,sealed.metadata.fingerprint256);
- const f=buildBetaFixture();const signed=await signSunatXmlWithStoredCertificate({...input,envelope:sealed.envelope,xml:f.xml.replace(/<ds:Signature\b[\s\S]*?<\/ds:Signature>/,'').replace(/<cac:Signature>[\s\S]*?<\/cac:Signature>/,'')});
+ const f=await buildBetaFixture();const signed=await signSunatXmlWithStoredCertificate({...input,envelope:sealed.envelope,xml:f.xml.replace(/<ds:Signature\b[\s\S]*?<\/ds:Signature>/,'').replace(/<cac:Signature>[\s\S]*?<\/cac:Signature>/,'')});
  assert.equal(verifySunatXml(signed,fixture.certificatePem),true);
 });
 test('IV aleatorio: dos cifrados del mismo certificado son distintos',async()=>{const again=await sealSunatCertificate(input);assert.notEqual(again.envelope,sealed.envelope);});
