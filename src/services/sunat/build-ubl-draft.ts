@@ -1,4 +1,5 @@
 import { validateSunatDraft, type SunatDocumentDraft } from './validate-document';
+import { calculateTaxedTotals } from './tax-calculation';
 
 /**
  * Generador preliminar UBL 2.1 para pruebas locales.
@@ -28,14 +29,21 @@ export function buildSunatUblDraft(input: SunatUblDraft): string {
   if (errors.length) throw new Error(errors.join(' '));
 
   // Redondeo por línea; no usar coma flotante para sumar totales.
-  const lines = input.items.map(item => {
-    const gross = cents(item.quantity * item.unitPrice);
-    const net = Math.round(gross / 1.18);
-    return { ...item, gross, net, tax: gross - net };
-  });
-  const gross = lines.reduce((sum, line) => sum + line.gross, 0);
-  const net = lines.reduce((sum, line) => sum + line.net, 0);
-  const tax = gross - net;
+  const calculated = calculateTaxedTotals(input.items.map(item => ({
+    description: item.description,
+    quantity: item.quantity,
+    unitPriceWithTax: item.unitPrice,
+  })));
+  const lines = calculated.lines.map(line => ({
+    ...line,
+    gross: line.grossCents,
+    net: line.taxableCents,
+    tax: line.taxCents,
+    unitPrice: line.unitPriceWithTax,
+  }));
+  const gross = calculated.grossCents;
+  const net = calculated.taxableCents;
+  const tax = calculated.taxCents;
   const documentId = `${input.series}-${input.number}`;
   const lineTag = input.documentType === '01' ? 'cac:InvoiceLine' : 'cac:InvoiceLine';
   const linesXml = lines.map((line, index) => `
@@ -57,7 +65,7 @@ export function buildSunatUblDraft(input: SunatUblDraft): string {
         </cac:TaxSubtotal>
       </cac:TaxTotal>
       <cac:Item><cbc:Description>${xml(line.description)}</cbc:Description></cac:Item>
-      <cac:Price><cbc:PriceAmount currencyID="PEN">${money(Math.round(line.net / line.quantity))}</cbc:PriceAmount></cac:Price>
+      <cac:Price><cbc:PriceAmount currencyID="PEN">${line.unitPriceWithoutTax.toFixed(6)}</cbc:PriceAmount></cac:Price>
     </${lineTag}>`).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
