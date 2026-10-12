@@ -10,14 +10,25 @@ No se han enviado comprobantes ni desplegado cambios a producción.
 - Servicio beta (solo pruebas estructurales): https://cpe.sunat.gob.pe/noticias/servicio-beta-para-realizar-pruebas-ubl-21
 
 ## Hallazgos de inspección estática (NO equivalen a ejecución de pruebas)
-1. **BLOQUEANTE:** `build-ubl-draft.ts` no incluye `cbc:ProfileID` (tipo de operación, catálogo 51).
+1. **CORREGIDO:** `build-ubl-draft.ts` incluye `cbc:ProfileID=0101`; sus metadatos aún deben contrastarse con las reglas oficiales.
 2. **BLOQUEANTE:** `ext:ExtensionContent` está vacío; no existe firma XMLDSig ni certificado aplicado.
 3. **BLOQUEANTE:** No se ha comprobado conformidad XSD ni reglas de validación CPE vigentes.
 4. **BLOQUEANTE:** No existe envío SOAP, recepción CDR ni gestión de respuestas en los nuevos archivos.
 5. **ALCANCE LIMITADO:** Solo admite operaciones gravadas al 18% con precios que incluyen IGV; no cubre exoneraciones, descuentos, gratuitas, detracciones ni otros supuestos.
 6. **REVISAR:** Comprobar metadatos de catálogos SUNAT, tipo de precio, datos del emisor, datos de cliente y orden de elementos contra guías y XSD.
 7. **REVISAR:** Redondeo del precio unitario neto en cantidades fraccionarias y conciliación de montos con reglas SUNAT.
-8. **PRUEBAS PENDIENTES:** `draft-checks.ts` contiene verificaciones de regresión, pero no se han ejecutado en un runner ni en CI.
+8. **PRUEBAS LOCALES EJECUTADAS:** Tres suites correctas con Node 24.19.0 (borrador/IGV, SOAP y WS-Security). Se comprobaron también rechazos de tipos desconocidos, series incompatibles y correlativo cero. No se ha ejecutado Deno, CI ni el typecheck completo del proyecto.
+
+## Reproducir pruebas aisladas
+
+Con Node 24 o posterior, sin dependencias, credenciales ni permisos de red:
+
+```sh
+node --test src/services/sunat/run-offline-tests.mjs
+```
+
+El runner de Deno conserva sus tres suites y ahora todas sus importaciones locales incluyen `.ts`.
+Los resultados locales no acreditan conformidad XSD ni aceptación por SUNAT.
 
 ## Criterio de salida
 - Ejecutar pruebas unitarias y regresión.
@@ -28,3 +39,4 @@ No se han enviado comprobantes ni desplegado cambios a producción.
 - Solicitar autorización expresa antes de fusionar o desplegar.
 
 **Estado: NO APTO PARA PRODUCCIÓN.**
+

@@ -21,3 +21,4 @@ export function runSunatWsseChecks(): void {
   assert(throws(() => buildSunatSecurityHeader({ ...credentials, password: '' })), 'Rechazo contraseña vacía');
   assert(throws(() => attachSunatSecurityHeader('<soapenv:Header/>', credentials)), 'Rechazo SOAP incompleto');
 }
+

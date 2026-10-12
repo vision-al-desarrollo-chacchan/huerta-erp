@@ -25,6 +25,12 @@ export interface SunatDocumentDraft {
 
 export function validateSunatDraft(draft: SunatDocumentDraft): string[] {
   const errors: string[] = [];
+  if (draft.documentType !== '01' && draft.documentType !== '03') {
+    errors.push('Tipo de comprobante no admitido.');
+  }
+  if (!['0', '1', '6'].includes(draft.receiverDocumentType)) {
+    errors.push('Tipo de documento del receptor no admitido.');
+  }
   if (!/^\d{11}$/.test(draft.issuerRuc)) errors.push('El RUC emisor debe tener 11 dígitos.');
   const expectedPrefix = draft.documentType === '01' ? 'F' : 'B';
   if (!new RegExp('^' + expectedPrefix + '[A-Z0-9]{3}$').test(draft.series)) {
@@ -69,3 +75,4 @@ export function validateSunatDraft(draft: SunatDocumentDraft): string[] {
   });
   return errors;
 }
+

@@ -1,5 +1,5 @@
-import { validateSunatDraft, type SunatDocumentDraft } from './validate-document';
-import { calculateTaxedTotals } from './tax-calculation';
+import { validateSunatDraft, type SunatDocumentDraft } from './validate-document.ts';
+import { calculateTaxedTotals } from './tax-calculation.ts';
 
 /**
  * Generador preliminar UBL 2.1 para pruebas locales.
@@ -106,3 +106,4 @@ export function buildSunatUblDraft(input: SunatUblDraft): string {
   ${linesXml}
 </Invoice>`;
 }
+

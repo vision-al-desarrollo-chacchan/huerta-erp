@@ -40,3 +40,4 @@ export function attachSunatSecurityHeader(soap: string, credentials: SolCredenti
   if (!soap.includes('<ser:sendBill>')) throw new Error('SOAP no corresponde a sendBill.');
   return soap.replace('<soapenv:Header/>', buildSunatSecurityHeader(credentials));
 }
+

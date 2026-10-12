@@ -18,6 +18,9 @@ const escapeXml = (s: string): string => s.replace(/[&<>"']/g, c =>
 
 /** Evita enviar accidentalmente documentos reales a producción. */
 export function getSunatEndpoint(environment: SunatEnvironment, productionAuthorized = false): string {
+  if (environment !== 'beta' && environment !== 'production') {
+    throw new Error('Entorno SUNAT no admitido.');
+  }
   if (environment === 'production' && !productionAuthorized) {
     throw new Error('Envío a producción bloqueado: requiere autorización explícita.');
   }
@@ -25,7 +28,8 @@ export function getSunatEndpoint(environment: SunatEnvironment, productionAuthor
 }
 
 export function validateSunatZipPayload(payload: SunatSoapPayload): void {
-  if (!/^\d{11}-(01|03)-[FB][A-Z0-9]{3}-\d{1,8}\.zip$/.test(payload.fileName)) {
+  const match = /^(\d{11})-(01|03)-([FB][A-Z0-9]{3})-([1-9]\d{0,7})\.zip$/.exec(payload.fileName);
+  if (!match || !match[3].startsWith(match[2] === '01' ? 'F' : 'B')) {
     throw new Error('Nombre de ZIP CPE inválido.');
   }
   if (!payload.contentFileBase64 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(payload.contentFileBase64)) {
@@ -54,3 +58,4 @@ export function buildSunatSendBillSoap(payload: SunatSoapPayload): string {
  </ser:sendBill></soapenv:Body>
 </soapenv:Envelope>`;
 }
+

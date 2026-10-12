@@ -1,5 +1,5 @@
-import { buildSunatUblDraft, type SunatUblDraft } from './build-ubl-draft';
-import { calculateTaxedTotals } from './tax-calculation';
+import { buildSunatUblDraft, type SunatUblDraft } from './build-ubl-draft.ts';
+import { calculateTaxedTotals } from './tax-calculation.ts';
 
 /**
  * Pruebas de regresión aisladas, sin llamadas a SUNAT ni credenciales.
@@ -30,6 +30,8 @@ const base: SunatUblDraft = {
 };
 
 export function runSunatDraftChecks(): void {
+  shouldThrow(() => buildSunatUblDraft({ ...base, documentType: '99' } as unknown as SunatUblDraft), 'Tipo de comprobante desconocido');
+  shouldThrow(() => buildSunatUblDraft({ ...base, receiverDocumentType: '99' } as unknown as SunatUblDraft), 'Tipo de receptor desconocido');
   const result = calculateTaxedTotals([{ description: 'Prueba', quantity: 1, unitPriceWithTax: 11.80 }]);
   assert(result.grossCents === 1180, 'Total con IGV debe ser S/11.80');
   assert(result.taxableCents === 1000, 'Base imponible debe ser S/10.00');
@@ -55,3 +57,4 @@ export function runSunatDraftChecks(): void {
   const escaped = buildSunatUblDraft({ ...base, receiverName: 'A & B <C>' });
   assert(escaped.includes('A &amp; B &lt;C&gt;'), 'Escapado XML');
 }
+
