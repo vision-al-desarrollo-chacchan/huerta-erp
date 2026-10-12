@@ -14,7 +14,7 @@ Se exige RSA >=2048, vigencia del certificado, correspondencia de clave privada
 y RUC en serialNumber/UID del sujeto. Certificados de proveedores con otro formato
 requieren revisar su representación de identidad. La verificación criptográfica
 no comprueba cadena de confianza, revocación ni inscripción del certificado en SUNAT.
-El código recibe PEM en memoria; aún falta la carga segura de PFX/P12 y su contraseña.
+Existe lectura local de PFX/P12 con contraseña en `pfx-signing.mjs`; falta la carga y el almacenamiento cifrado multiempresa en el servicio del ERP.
 No almacenar certificados privados en git ni enviarlos al frontend.
 
 ## Pruebas locales
@@ -91,3 +91,32 @@ Se agregó `electronic-billing-beta` con persistencia beta separada y RPC de res
 Consultar su README para pruebas, permisos y pasos de despliegue aislado. Esta
 función está deshabilitada por defecto y no se desplegó. El transporte Deno/JS
 se verificó localmente con respuestas simuladas y con el CDR beta real ya obtenido.
+
+## PFX/P12 con contraseña — 2026-10-12
+
+`inspectSunatPfx({pfxBase64,password,issuerRuc})` devuelve exclusivamente datos
+públicos: RUC, sujeto, vigencia, huella y tamaño de clave.
+`signSunatXmlWithPfx({xml,pfxBase64,password,issuerRuc})` devuelve el XML firmado.
+Estas funciones solo deben importarse en el backend autorizado.
+
+Se exige contenedor con MAC y una sola clave privada cifrada RSA >=2048,
+certificado coincidente vigente y RUC en serialNumber/UID. Admite certificados
+adicionales en el contenedor, pero exige un único certificado que corresponda
+a la clave privada. Base64 canónico, máximo 2 MB decodificados. Los errores
+se sanitizan; no se guardan archivos ni se realizan solicitudes de red.
+
+Se limpia el buffer de entrada tras leerlo. JavaScript no permite garantizar
+la eliminación inmediata de cadenas PEM, contraseña u objetos criptográficos
+en memoria; no se devuelve la clave privada ni se conserva en variables globales.
+No comprueba cadena de confianza, revocación o inscripción SUNAT. Formatos de
+proveedores reales y límites de tiempo/carga deben verificarse antes de exponer
+un endpoint de carga de certificados. No se agregó ese endpoint ni se desplegó.
+
+Seis pruebas nuevas correctas en Node, con PFX ficticios generados en memoria:
+lectura/firma, contraseña errónea, archivo corrupto, RUC/ XML ajeno, vencimiento,
+fecha futura, RSA débil, clave ausente o no coincidente, MAC ausente y límites
+de entrada. Ninguna clave de prueba se escribió en disco.
+
+```sh
+node --test supabase/functions/_shared/sunat-signing/pfx-signing.test.mjs
+```

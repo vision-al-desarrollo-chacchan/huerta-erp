@@ -11,7 +11,7 @@ No se han enviado comprobantes ni desplegado cambios a producción.
 
 ## Hallazgos de inspección estática (NO equivalen a ejecución de pruebas)
 1. **CORREGIDO:** `build-ubl-draft.ts` incluye `cbc:ProfileID=0101`; sus metadatos aún deben contrastarse con las reglas oficiales.
-2. **AVANCE LOCAL:** Existe firma XMLDSig en `supabase/functions/_shared/sunat-signing/`; factura y boleta firmadas con certificados ficticios verificadas. Falta carga segura de PFX/P12 y certificado real.
+2. **AVANCE LOCAL:** Existe firma XMLDSig en `supabase/functions/_shared/sunat-signing/`; factura y boleta firmadas con certificados ficticios verificadas. Existe lectura/firma local PFX/P12 con contraseña y pruebas ficticias; falta endpoint de carga autenticado, almacenamiento cifrado multiempresa y certificado real.
 3. **XSD LOCAL CORRECTO:** Factura y boleta firmadas válidas contra el XSD UBL 2.1 oficial descargado de SUNAT. Las reglas CPE vigentes completas aún no se han validado.
 4. **BETA AISLADA ACEPTADA:** `probe_beta.py` envió una factura ficticia firmada; SUNAT beta devolvió HTTP 200 y CDR código 0. Existe lectura de SOAP Fault/CDR con pruebas. Existe nueva función `electronic-billing-beta` con estados y artefactos separados, permisos e idempotencia verificados localmente. Falta ejecutar JWT/RPC/Storage en Supabase de pruebas; no se desplegó ni se conectó a documentos reales.
 5. **ALCANCE LIMITADO:** Solo admite operaciones gravadas al 18% con precios que incluyen IGV; no cubre exoneraciones, descuentos, gratuitas, detracciones ni otros supuestos.

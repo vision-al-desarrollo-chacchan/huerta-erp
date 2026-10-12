@@ -1,1 +1,7 @@
-{"imports":{"xml-crypto":"npm:xml-crypto@6.3.3","@xmldom/xmldom":"npm:@xmldom/xmldom@0.9.12"}}
+{
+  "imports": {
+    "xml-crypto": "npm:xml-crypto@6.3.3",
+    "@xmldom/xmldom": "npm:@xmldom/xmldom@0.9.12",
+    "node-forge": "npm:node-forge@1.4.0"
+  }
+}
