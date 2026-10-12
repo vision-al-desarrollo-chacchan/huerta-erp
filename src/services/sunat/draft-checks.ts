@@ -40,6 +40,7 @@ export function runSunatDraftChecks(): void {
   assert(xml.includes('<cbc:PayableAmount currencyID="PEN">11.80</cbc:PayableAmount>'), 'Total XML');
   assert(xml.includes('<cbc:TaxAmount currencyID="PEN">1.80</cbc:TaxAmount>'), 'IGV XML');
   assert(xml.includes('<cbc:ID>B001-1</cbc:ID>'), 'Serie y correlativo');
+  assert(xml.includes('>0101</cbc:ProfileID>'), 'Tipo de operación venta interna');
   const factura = buildSunatUblDraft({
     ...base, documentType: '01', series: 'F001',
     receiverDocumentType: '6', receiverDocumentNumber: '20654321098',
