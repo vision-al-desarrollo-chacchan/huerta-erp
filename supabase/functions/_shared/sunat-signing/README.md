@@ -84,3 +84,10 @@ python supabase/functions/_shared/sunat-signing/probe_beta.py /tmp/huerta-sunat-
 Resultado mínimo en `BETA_RESULT.json`. Ocho pruebas Node y seis de lectura CDR
 correctas después de las correcciones. Aceptación beta no equivale a autorización
 ni aceptación tributaria en producción.
+
+## Backend beta
+
+Se agregó `electronic-billing-beta` con persistencia beta separada y RPC de reserva.
+Consultar su README para pruebas, permisos y pasos de despliegue aislado. Esta
+función está deshabilitada por defecto y no se desplegó. El transporte Deno/JS
+se verificó localmente con respuestas simuladas y con el CDR beta real ya obtenido.
