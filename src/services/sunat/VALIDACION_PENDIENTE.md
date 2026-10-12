@@ -40,3 +40,11 @@ Los resultados locales no acreditan conformidad XSD ni aceptación por SUNAT.
 
 **Estado: NO APTO PARA PRODUCCIÓN.**
 
+
+## Actualización: instalación autorizada en Supabase
+
+Se aplicaron las dos migraciones SUNAT y se desplegaron las funciones beta y
+carga de certificados en huerta-erp, deshabilitadas. Se verificaron permisos,
+reserva/idempotencia con rollback y arranque HTTP 401/503. No se realizó envío
+ni se cargaron certificados; falta sesión administrativa y prueba completa.
+Detalle: `supabase/functions/_shared/sunat-signing/SUPABASE_VERIFICATION.md`.

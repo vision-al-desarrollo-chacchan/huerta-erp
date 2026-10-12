@@ -1,3 +1,9 @@
+> Actualización 2026-10-12: las migraciones y esta función se instalaron, con
+> autorización del usuario, en huerta-erp. La funcionalidad permanece deshabilitada.
+> Ver `../_shared/sunat-signing/SUPABASE_VERIFICATION.md` para resultados y pendientes.
+> Las secciones de preparación siguientes describen el estado previo y los pasos
+> que aún deben completarse antes de activar pruebas.
+
 # Backend SUNAT beta aislado
 
 Nueva Edge Function `electronic-billing-beta`, deshabilitada por defecto.
@@ -30,7 +36,7 @@ una RPC de reserva y un bucket privado `sunat-beta-pruebas`.
 
 ## Preparación de un entorno de pruebas
 
-Estos pasos NO se ejecutaron contra una cuenta Supabase durante esta entrega:
+Los pasos de migración y despliegue ya se completaron en huerta-erp; activación y ejecución con sesión administrativa siguen pendientes:
 
 1. Revisar y aplicar la nueva migración exclusivamente en un Supabase de pruebas
    con el esquema HUERTA ERP. No usar `db push` apuntando a producción.

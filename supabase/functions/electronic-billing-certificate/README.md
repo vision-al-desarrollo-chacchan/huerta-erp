@@ -1,7 +1,13 @@
+> Actualización 2026-10-12: las migraciones y esta función se instalaron, con
+> autorización del usuario, en huerta-erp. La funcionalidad permanece deshabilitada.
+> Ver `../_shared/sunat-signing/SUPABASE_VERIFICATION.md` para resultados y pendientes.
+> Las secciones de preparación siguientes describen el estado previo y los pasos
+> que aún deben completarse antes de activar pruebas.
+
 # Carga de certificados SUNAT — preparada para pruebas locales
 
 Nueva función `electronic-billing-certificate`. Está deshabilitada por defecto,
-no se desplegó y su migración no se aplicó a ningún proyecto Supabase remoto.
+se desplegó y su migración se aplicó en huerta-erp con autorización; sigue deshabilitada.
 
 POST autenticado: empresaId (UUID), fileName (.pfx/.p12), pfxBase64 y password.
 No acepta RUC elegido por el navegador. Verifica el JWT con getUser, comprueba
