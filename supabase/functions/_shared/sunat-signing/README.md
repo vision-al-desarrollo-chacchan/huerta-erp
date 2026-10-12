@@ -127,3 +127,10 @@ Se preparó `electronic-billing-certificate`, junto a `certificate-vault.mjs` y
 una migración nueva generada por Supabase CLI. El endpoint y la migración no se
 desplegaron. La lectura PFX y la firma desde ciphertext se probaron localmente.
 Consultar el README de esa función para configuración, límites y evidencia.
+
+## Prueba de flujo integrado local
+
+`local-flow.test.mjs` compone carga/cifrado, base PostgreSQL, firma desde vault,
+SOAP/CDR y persistencia. Cuatro casos correctos; factura de ese flujo válida
+contra XSD oficial y firma verificada independientemente. Auth y SUNAT se simulan
+y los artefactos Storage se representan en la base local. Ver `LOCAL_FLOW.md`.
