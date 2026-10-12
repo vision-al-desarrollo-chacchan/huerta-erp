@@ -46,7 +46,7 @@ ese runtime y el despliegue Supabase todavía no se han probado.
 
 Esto acredita estructura XSD y firma local, no aceptación tributaria por SUNAT.
 Quedan pendientes reglas CPE actuales completas, certificado real registrado,
-transporte beta, CDR y validación de extremo a extremo.
+integración del transporte/CDR con el ERP y validación de extremo a extremo en su runtime real. Se realizó un envío aislado a beta, descrito abajo.
 
 ## Fuentes
 
@@ -54,3 +54,33 @@ transporte beta, CDR y validación de extremo a extremo.
 - https://cpe.sunat.gob.pe/sites/default/files/inline-files/Archivos%20XSD%20%281%29.zip
 - https://orientacion.sunat.gob.pe/12-pautas-servicio-beta
 - https://github.com/node-saml/xml-crypto
+
+## Envío real a beta — 2026-10-12
+
+Factura ficticia `20123456789-01-F001-1`, firmada con certificado autofirmado.
+Respuesta HTTP 200, CDR código `0`: «La Factura numero F001-1, ha sido aceptada».
+Se usaron exclusivamente las credenciales públicas de beta MODDATOS. No se
+usaron el RUC de Chicken Huerta, claves SOL reales ni producción.
+
+Se corrigieron tres rechazos observados antes de la aceptación:
+- 3030: código del local anexo (`AddressTypeCode`, por defecto 0000).
+- 3205: tipo de operación (`InvoiceTypeCode/@listID=0101`).
+- 3244: forma de pago (`PaymentTerms`, FormaPago/Contado).
+
+El parser distingue SOAP Fault, CDR aceptado y CDR rechazado, verifica la
+referencia del documento y limita tamaños. Admite un directorio dentro del ZIP.
+Su lectura no verifica criptográficamente la firma del CDR; no está conectada
+a estados persistentes del ERP, reintentos ni vistas de usuario.
+
+`probe_beta.py` solo permite esta factura ficticia fija, bloquea redirecciones y
+no admite endpoint configurable. No realiza reintentos automáticos. La prueba
+manual requiere autorización de envío a beta y no es una prueba de carga.
+
+```sh
+python supabase/functions/_shared/sunat-signing/test_beta_response.py
+python supabase/functions/_shared/sunat-signing/probe_beta.py /tmp/huerta-sunat-prueba/factura.xml --schema '/tmp/huerta-sunat-xsd/Archivos XSD/2.1/maindoc/UBL-Invoice-2.1.xsd' --certificate /tmp/huerta-sunat-prueba/certificate.pem --output-dir /tmp/huerta-sunat-beta-respuesta
+```
+
+Resultado mínimo en `BETA_RESULT.json`. Ocho pruebas Node y seis de lectura CDR
+correctas después de las correcciones. Aceptación beta no equivale a autorización
+ni aceptación tributaria en producción.

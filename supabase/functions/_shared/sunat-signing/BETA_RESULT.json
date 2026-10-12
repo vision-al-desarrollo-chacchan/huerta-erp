@@ -1,0 +1,11 @@
+{
+  "status": "ACCEPTED_BETA",
+  "code": "0",
+  "description": "La Factura numero F001-1, ha sido aceptada",
+  "notes": [],
+  "environment": "beta",
+  "http_status": 200,
+  "document": "20123456789-01-F001-1",
+  "test_only": true,
+  "date": "2026-10-12"
+}

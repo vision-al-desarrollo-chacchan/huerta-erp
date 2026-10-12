@@ -4,11 +4,13 @@ import { calculateTaxedTotals } from './tax-calculation.ts';
 /**
  * Generador preliminar UBL 2.1 para pruebas locales.
  * NO enviar a SUNAT sin completar impuestos, firma XMLDSig y validación XSD.
- * Supuestos: precios en PEN incluyen IGV 18%, todos los ítems gravados.
+ * Supuestos: precios en PEN incluyen IGV 18%, todos los ítems gravados, pago al contado.
  */
 export type SunatUblDraft = SunatDocumentDraft & {
   issuerName: string;
   issuerAddress: string;
+  issuerEstablishmentCode?: string;
+  paymentMode?: 'Contado';
   receiverAddress?: string;
 };
 
@@ -26,6 +28,8 @@ export function buildSunatUblDraft(input: SunatUblDraft): string {
   if (!input.issuerAddress.trim()) errors.push('Falta dirección del emisor.');
   if (input.items.some(item => !Number.isFinite(item.quantity * item.unitPrice) ||
     item.quantity * item.unitPrice > 1000000000)) errors.push('Importe de ítem fuera de rango.');
+  if (!/^\d{4}$/.test(input.issuerEstablishmentCode ?? '0000')) errors.push('Código de local anexo inválido.');
+  if (input.paymentMode !== undefined && input.paymentMode !== 'Contado') errors.push('El borrador solo admite pago al contado.');
   if (errors.length) throw new Error(errors.join(' '));
 
   // Redondeo por línea; no usar coma flotante para sumar totales.
@@ -79,19 +83,20 @@ export function buildSunatUblDraft(input: SunatUblDraft): string {
   <cbc:ProfileID schemeName="SUNAT:Identificador de Tipo de Operación" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo17">0101</cbc:ProfileID>
   <cbc:ID>${xml(documentId)}</cbc:ID>
   <cbc:IssueDate>${xml(input.issueDate)}</cbc:IssueDate>
-  <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${input.documentType}</cbc:InvoiceTypeCode>
+  <cbc:InvoiceTypeCode listID="0101" listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${input.documentType}</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>PEN</cbc:DocumentCurrencyCode>
   <cac:AccountingSupplierParty><cac:Party>
     <cac:PartyIdentification><cbc:ID schemeID="6">${xml(input.issuerRuc)}</cbc:ID></cac:PartyIdentification>
     <cac:PartyName><cbc:Name>${xml(input.issuerName)}</cbc:Name></cac:PartyName>
     <cac:PartyLegalEntity><cbc:RegistrationName>${xml(input.issuerName)}</cbc:RegistrationName>
-      <cac:RegistrationAddress><cac:AddressLine><cbc:Line>${xml(input.issuerAddress)}</cbc:Line></cac:AddressLine></cac:RegistrationAddress>
+      <cac:RegistrationAddress><cbc:AddressTypeCode>${xml(input.issuerEstablishmentCode ?? '0000')}</cbc:AddressTypeCode><cac:AddressLine><cbc:Line>${xml(input.issuerAddress)}</cbc:Line></cac:AddressLine></cac:RegistrationAddress>
     </cac:PartyLegalEntity>
   </cac:Party></cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty><cac:Party>
     <cac:PartyIdentification><cbc:ID schemeID="${input.receiverDocumentType}">${xml(input.receiverDocumentNumber)}</cbc:ID></cac:PartyIdentification>
     <cac:PartyLegalEntity><cbc:RegistrationName>${xml(input.receiverName)}</cbc:RegistrationName></cac:PartyLegalEntity>
   </cac:Party></cac:AccountingCustomerParty>
+  ${input.documentType === '01' ? '<cac:PaymentTerms><cbc:ID>FormaPago</cbc:ID><cbc:PaymentMeansID>Contado</cbc:PaymentMeansID></cac:PaymentTerms>' : ''}
   <cac:TaxTotal><cbc:TaxAmount currencyID="PEN">${money(tax)}</cbc:TaxAmount>
     <cac:TaxSubtotal><cbc:TaxableAmount currencyID="PEN">${money(net)}</cbc:TaxableAmount>
       <cbc:TaxAmount currencyID="PEN">${money(tax)}</cbc:TaxAmount>

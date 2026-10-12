@@ -48,6 +48,11 @@ export function runSunatDraftChecks(): void {
     receiverDocumentType: '6', receiverDocumentNumber: '20654321098',
   });
   assert(factura.includes('>01</cbc:InvoiceTypeCode>'), 'Código factura');
+  assert(factura.includes('<cbc:InvoiceTypeCode listID="0101"'), 'Tipo de operación requerido por beta');
+  assert(factura.includes('<cbc:AddressTypeCode>0000</cbc:AddressTypeCode>'), 'Local anexo requerido');
+  assert(factura.includes('<cbc:PaymentMeansID>Contado</cbc:PaymentMeansID>'), 'Forma de pago requerida');
+  shouldThrow(() => buildSunatUblDraft({ ...base, issuerEstablishmentCode: '01' }), 'Local anexo de cuatro dígitos');
+  shouldThrow(() => buildSunatUblDraft({ ...base, paymentMode: 'Credito' } as unknown as SunatUblDraft), 'Crédito fuera de alcance');
   shouldThrow(() => buildSunatUblDraft({ ...base, documentType: '01', series: 'B001' }), 'Serie factura');
   shouldThrow(() => buildSunatUblDraft({ ...base, issuerRuc: '123' }), 'RUC inválido');
   shouldThrow(() => buildSunatUblDraft({ ...base, items: [{ description: '', quantity: 1, unitPrice: 5 }] }), 'Descripción obligatoria');
