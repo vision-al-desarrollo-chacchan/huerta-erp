@@ -2,7 +2,7 @@
 import { Buffer } from 'node:buffer';
 import { createPrivateKey, X509Certificate } from 'node:crypto';
 import forge from 'node-forge';
-import { signSunatXml } from './sign-xml.mjs';
+import { signSunatXml, rsaCertificateMatchesKey } from './sign-xml.mjs';
 
 function readPfx({ pfxBase64, password, issuerRuc }) {
   if (typeof pfxBase64 !== 'string' || pfxBase64.length > 2_800_000 || !pfxBase64 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(pfxBase64)) throw new Error('Archivo PFX/P12 inválido o fuera de rango.');
@@ -22,7 +22,7 @@ function readPfx({ pfxBase64, password, issuerRuc }) {
     const privateKeyPem = forge.pki.privateKeyToPem(encrypted[0].key);
     const key = createPrivateKey(privateKeyPem);
     if (key.asymmetricKeyType !== 'rsa' || key.asymmetricKeyDetails.modulusLength < 2048) throw new Error();
-    const matches = certs.filter(bag => bag.cert).map(bag => forge.pki.certificateToPem(bag.cert)).filter(pem => new X509Certificate(pem).checkPrivateKey(key));
+    const matches = certs.filter(bag => bag.cert).map(bag => forge.pki.certificateToPem(bag.cert)).filter(pem => rsaCertificateMatchesKey(pem, privateKeyPem));
     if (matches.length !== 1) throw new Error();
     const cert = new X509Certificate(matches[0]);
     const now = Date.now();
