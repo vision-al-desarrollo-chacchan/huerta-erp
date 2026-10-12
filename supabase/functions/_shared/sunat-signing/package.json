@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.2",
+    "@xmldom/xmldom": "0.9.12",
+    "fflate": "0.8.2",
+    "node-forge": "1.4.0",
+    "xml-crypto": "6.3.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.9",
+    "@types/node": "24.19.2"
+  }
+}
