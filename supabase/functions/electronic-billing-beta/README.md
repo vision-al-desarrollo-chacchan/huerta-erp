@@ -1,3 +1,9 @@
+> Actualización: SUNAT beta activada con autorización del usuario en huerta-erp.
+> Solo usa factura y certificado ficticios. JWT y permisos administrativos siguen
+> siendo obligatorios. No activa electronic-billing-send ni carga de certificados reales.
+> SUNAT_BETA_ENABLED=false permite volver a deshabilitarla; en otros proyectos
+> permanece deshabilitada por defecto. La interfaz aún necesita su control de prueba.
+
 > Actualización 2026-10-12: las migraciones y esta función se instalaron, con
 > autorización del usuario, en huerta-erp. La funcionalidad permanece deshabilitada.
 > Ver `../_shared/sunat-signing/SUPABASE_VERIFICATION.md` para resultados y pendientes.

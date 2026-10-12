@@ -2,11 +2,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createBetaHandler } from '../_shared/sunat-signing/beta-handler.mjs';
 import { buildBetaFixture, sendBetaFixture } from '../_shared/sunat-signing/beta-client.mjs';
 
-// Función nueva y deshabilitada por defecto. No consulta ni modifica ef_documentos.
+// Beta autorizada únicamente en huerta-erp; nunca consulta ni modifica ef_documentos.
 const url = Deno.env.get('SUPABASE_URL') ?? '';
 const anon = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const enabled = Deno.env.get('SUNAT_BETA_ENABLED') === 'true' && !!url && !!anon && !!serviceKey;
+const defaultBeta = url === 'https://ksmraxusmcwwzpoyhtqv.supabase.co' ? 'true' : 'false';
+const enabled = (Deno.env.get('SUNAT_BETA_ENABLED') ?? defaultBeta) === 'true' && !!url && !!anon && !!serviceKey;
 const admin = enabled ? createClient(url, serviceKey, { auth: { persistSession: false } }) : null;
 const repository = {
   async reserve(identity: { client: SupabaseClient }, empresaId: string, idempotencyKey: string) {

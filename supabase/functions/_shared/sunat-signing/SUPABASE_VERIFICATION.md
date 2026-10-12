@@ -65,3 +65,14 @@ sigue descrito en LOCAL_FLOW.md.
 
 La carga de certificados reales queda apagada hasta configurar de forma segura la
 clave dedicada y comprobar permisos/formatos. Emisión real no autorizada ni activada.
+
+## Actualización: beta activada por autorización expresa
+
+Se desplegó electronic-billing-beta versión 2. En huerta-erp se habilita por
+defecto salvo SUNAT_BETA_ENABLED=false; otros proyectos conservan el valor
+default deshabilitado. Sigue requiriendo JWT de usuario y administración activa.
+HTTP POST con la clave anon: 401 «Sesión inválida», confirmando que ya no devuelve
+503 de beta deshabilitada y que no se concede acceso de usuario a una clave pública.
+La función de certificados sigue devolviendo 503 de carga deshabilitada.
+No se envió documento durante esta activación. El control de prueba del frontend
+y la ejecución con sesión administrativa siguen pendientes.
