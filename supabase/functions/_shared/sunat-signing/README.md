@@ -120,3 +120,10 @@ de entrada. Ninguna clave de prueba se escribió en disco.
 ```sh
 node --test supabase/functions/_shared/sunat-signing/pfx-signing.test.mjs
 ```
+
+## Carga y cifrado por empresa
+
+Se preparó `electronic-billing-certificate`, junto a `certificate-vault.mjs` y
+una migración nueva generada por Supabase CLI. El endpoint y la migración no se
+desplegaron. La lectura PFX y la firma desde ciphertext se probaron localmente.
+Consultar el README de esa función para configuración, límites y evidencia.
