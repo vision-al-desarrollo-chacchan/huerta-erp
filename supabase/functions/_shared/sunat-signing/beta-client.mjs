@@ -1,5 +1,5 @@
 /** Backend beta únicamente: datos ficticios, TLS, sin endpoint configurable ni reintentos. */
-import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import forge from 'node-forge';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
@@ -18,8 +18,10 @@ function parse(xml) {
   if (Buffer.byteLength(xml) > MAX || /<!DOCTYPE|<!ENTITY/i.test(xml)) throw new Error('Respuesta XML fuera de rango.');
   return new DOMParser({ onError: () => { throw new Error('Respuesta XML mal formada.'); } }).parseFromString(xml, 'application/xml');
 }
-export function buildBetaFixture() {
-  const keys = generateKeyPairSync('rsa', { modulusLength: 2048, publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
+export async function buildBetaFixture() {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pem = (label, value) => `-----BEGIN ${label}-----\n${Buffer.from(value).toString('base64').match(/.{1,64}/g).join('\n')}\n-----END ${label}-----`;
+  const keys = { publicKey: pem('PUBLIC KEY', await crypto.subtle.exportKey('spki', pair.publicKey)), privateKey: pem('PRIVATE KEY', await crypto.subtle.exportKey('pkcs8', pair.privateKey)) };
   const cert = forge.pki.createCertificate();
   cert.publicKey = forge.pki.publicKeyFromPem(keys.publicKey);
   cert.serialNumber = '01' + randomBytes(16).toString('hex');

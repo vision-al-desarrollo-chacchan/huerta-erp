@@ -27,24 +27,29 @@ export function createBetaHandler({ enabled, authenticate, repository, buildFixt
     if (!claimed) return reply({ ...publicJob(job), duplicatePrevented: true }, job.estado === 'enviando' || job.estado === 'pendiente' ? 202 : 200);
     job = claimed;
     let startedSending = false;
+    let stage = 'firma';
     try {
       const fixture = await buildFixture();
+      stage = 'almacenamiento XML';
       const xmlPath = `${job.empresa_id}/${job.id}/documento.xml`;
       await repository.store(xmlPath, new TextEncoder().encode(fixture.xml), 'application/xml');
+      stage = 'envío';
       startedSending = true;
       const result = await sendFixture(fixture);
+      stage = 'respuesta CDR';
       let cdrPath = null;
       if (result.cdr) {
         cdrPath = `${job.empresa_id}/${job.id}/cdr.zip`;
         await repository.store(cdrPath, result.cdr, 'application/zip');
       }
+      stage = 'guardado de resultado';
       const saved = await repository.finish(job, { estado: result.status, codigo_sunat: result.code, mensaje_sunat: result.message, observaciones: result.notes, xml_path: xmlPath, cdr_path: cdrPath });
       return reply(publicJob(saved));
     } catch {
       // Tras comenzar el envío no se sabe si SUNAT lo recibió: nunca reintentar automáticamente.
       const estado = startedSending ? 'incierto' : 'error';
       try {
-        const saved = await repository.finish(job, { estado, mensaje_sunat: startedSending ? 'No se confirmó el resultado del envío beta. Revisar antes de repetir.' : 'No se pudo preparar la prueba beta.' });
+        const saved = await repository.finish(job, { estado, mensaje_sunat: startedSending ? 'No se confirmó el resultado del envío beta. Revisar antes de repetir.' : `No se pudo preparar la prueba beta. Etapa: ${stage}.` });
         return reply(publicJob(saved), 502);
       } catch { return reply({ id: job.id, estado: 'incierto', error: 'No se pudo confirmar ni guardar el resultado. No repetir automáticamente.' }, 503); }
     }

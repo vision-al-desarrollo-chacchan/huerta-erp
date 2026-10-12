@@ -1,6 +1,7 @@
 /** Servidor únicamente. No realiza envíos ni persiste certificados o claves. */
 import { createPrivateKey, X509Certificate, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
+import forge from 'node-forge';
 import { SignedXml } from 'xml-crypto';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 
@@ -28,6 +29,14 @@ function issuer(document) {
   if (id.getAttribute('schemeID') !== '6' || !/^\d{11}$/.test(id.textContent)) throw new Error('RUC emisor inválido.');
   return { ruc: id.textContent, name: one(children(one(children(party, CAC, 'PartyLegalEntity')), CBC, 'RegistrationName')).textContent };
 }
+/** Comparación RSA portable: Supabase Edge no implementa X509Certificate.checkPrivateKey. */
+export function rsaCertificateMatchesKey(certificatePem, privateKeyPem) {
+  try {
+    const publicKey = forge.pki.certificateFromPem(certificatePem).publicKey;
+    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+    return publicKey.n.equals(privateKey.n) && publicKey.e.equals(privateKey.e);
+  } catch { return false; }
+}
 function certificate(pem, ruc) {
   let cert;
   try { cert = new X509Certificate(pem); } catch { throw new Error('Certificado inválido.'); }
@@ -46,10 +55,10 @@ function extension(document) {
 export function signSunatXml({ xml, certificatePem, privateKeyPem }) {
   const document = parse(xml);
   const identity = issuer(document);
-  const cert = certificate(certificatePem, identity.ruc);
+  certificate(certificatePem, identity.ruc);
   let key;
   try { key = createPrivateKey(privateKeyPem); } catch { throw new Error('Clave privada inválida.'); }
-  if (!cert.checkPrivateKey(key)) throw new Error('La clave privada no corresponde al certificado.');
+  if (!rsaCertificateMatchesKey(certificatePem, privateKeyPem)) throw new Error('La clave privada no corresponde al certificado.');
   const content = extension(document);
   if (Array.from(content.childNodes).some(n => n.nodeType === 1 || n.textContent.trim()) || document.getElementsByTagNameNS(DS, 'Signature').length || children(document.documentElement, CAC, 'Signature').length) throw new Error('El documento ya contiene una firma o extensión.');
   const root = document.documentElement;
@@ -72,7 +81,7 @@ export function signSunatXml({ xml, certificatePem, privateKeyPem }) {
 export function verifySunatXml(xml, trustedCertificatePem) {
   const document = parse(xml);
   const identity = issuer(document);
-  const cert = certificate(trustedCertificatePem, identity.ruc);
+  certificate(trustedCertificatePem, identity.ruc);
   const signature = one(Array.from(document.getElementsByTagNameNS(DS, 'Signature')));
   if (signature.parentNode !== extension(document) || signature.getAttribute('Id') !== SIGNATURE_ID) throw new Error('Ubicación de firma inválida.');
   const metadata = one(children(document.documentElement, CAC, 'Signature'));
@@ -83,9 +92,13 @@ export function verifySunatXml(xml, trustedCertificatePem) {
   const transforms = children(one(children(reference, DS, 'Transforms')), DS, 'Transform').map(n => n.getAttribute('Algorithm'));
   if (reference.getAttribute('URI') !== '' || one(children(info, DS, 'CanonicalizationMethod')).getAttribute('Algorithm') !== C14N || one(children(info, DS, 'SignatureMethod')).getAttribute('Algorithm') !== RSA_SHA256 || one(children(reference, DS, 'DigestMethod')).getAttribute('Algorithm') !== SHA256 || transforms.join('|') !== [DS + 'enveloped-signature', C14N].join('|')) throw new Error('Perfil XMLDSig no admitido.');
   const embedded = one(Array.from(signature.getElementsByTagNameNS(DS, 'X509Certificate')));
-  let embeddedCert;
-  try { embeddedCert = new X509Certificate(Buffer.from(embedded.textContent.replace(/\s/g, ''), 'base64')); } catch { throw new Error('Certificado XML inválido.'); }
-  if (cert.raw.length !== embeddedCert.raw.length || !timingSafeEqual(cert.raw, embeddedCert.raw)) throw new Error('Certificado XML no corresponde al certificado confiable.');
+  let trustedDer, embeddedDer;
+  try {
+    trustedDer = Buffer.from(forge.asn1.toDer(forge.pki.certificateToAsn1(forge.pki.certificateFromPem(trustedCertificatePem))).getBytes(), 'binary');
+    embeddedDer = Buffer.from(embedded.textContent.replace(/\s/g, ''), 'base64');
+    forge.pki.certificateFromAsn1(forge.asn1.fromDer(embeddedDer.toString('binary')));
+  } catch { throw new Error('Certificado XML inválido.'); }
+  if (trustedDer.length !== embeddedDer.length || !timingSafeEqual(trustedDer, embeddedDer)) throw new Error('Certificado XML no corresponde al certificado confiable.');
   const verifier = new SignedXml({ publicCert: trustedCertificatePem, getCertFromKeyInfo: () => null });
   verifier.loadSignature(signature);
   if (!verifier.checkSignature(xml) || verifier.getSignedReferences().length !== 1) throw new Error('Firma digital inválida.');
