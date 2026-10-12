@@ -50,6 +50,8 @@ export function runSunatDraftChecks(): void {
   shouldThrow(() => buildSunatUblDraft({ ...base, issuerRuc: '123' }), 'RUC inválido');
   shouldThrow(() => buildSunatUblDraft({ ...base, items: [{ description: '', quantity: 1, unitPrice: 5 }] }), 'Descripción obligatoria');
   shouldThrow(() => buildSunatUblDraft({ ...base, items: [{ description: 'Error', quantity: 0, unitPrice: 5 }] }), 'Cantidad positiva');
+  shouldThrow(() => buildSunatUblDraft({ ...base, number: 100000000 }), 'Correlativo fuera de rango');
+  shouldThrow(() => buildSunatUblDraft({ ...base, items: [{ description: 'Error', quantity: 1, unitPrice: 0 }] }), 'Precio cero no permitido en borrador gravado');
   const escaped = buildSunatUblDraft({ ...base, receiverName: 'A & B <C>' });
   assert(escaped.includes('A &amp; B &lt;C&gt;'), 'Escapado XML');
 }
