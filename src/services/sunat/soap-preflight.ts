@@ -31,6 +31,11 @@ export function validateSunatZipPayload(payload: SunatSoapPayload): void {
   if (!payload.contentFileBase64 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(payload.contentFileBase64)) {
     throw new Error('Contenido ZIP base64 inválido.');
   }
+  // Un ZIP normal empieza por PK\\x03\\x04 (UEsDB en base64).
+  // Esto solo verifica la cabecera; el backend debe comprobar el ZIP completo.
+  if (!payload.contentFileBase64.startsWith('UEsDB')) {
+    throw new Error('El contenido no presenta la cabecera de un archivo ZIP.');
+  }
 }
 
 /**
