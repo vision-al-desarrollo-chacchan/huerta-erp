@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, Banknote, CalendarDays, ChefHat, CircleDollarSign, Clock3, Package, ShoppingBag, Store } from 'lucide-react';
-import { getCashSession, getCashSessionSales, getOrders, getProducts, orderTotal, subscribeRestaurantData, type CashSessionSale } from '../services/restaurant-store';
-import type { RestaurantOrder, RestaurantProduct } from '../types/restaurant';
+import { subscribeRestaurantData, subscribeProducts } from '../services/restaurant-store';
+import { getDashboardSummary, emptyDashboard, limaToday, shiftDate, type DashboardSummary } from '../services/reporting';
 import { getCompanySettings } from '../services/erp-store';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
 export default function Dashboard() {
   const [companyName, setCompanyName] = useState('');
-  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
-  const [cashOpen, setCashOpen] = useState(false);
-  const [products, setProducts] = useState<RestaurantProduct[]>([]);
-  const [cashSessionSales, setCashSessionSales] = useState<CashSessionSale[]>([]);
+  const [summary, setSummary] = useState<DashboardSummary>(emptyDashboard);
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
@@ -33,42 +30,32 @@ export default function Dashboard() {
   useEffect(() => {
     let mounted = true;
     let unsubscribe: (() => void) | undefined;
+    let unsubscribeCatalog: (() => void) | undefined;
     const load = async () => {
       try {
-        const since = new Date();
-        since.setHours(0, 0, 0, 0);
-        since.setDate(since.getDate() - 6);
-        const [currentOrders, cash, currentProducts, currentCashSessionSales] = await Promise.all([getOrders(), getCashSession(), getProducts(), getCashSessionSales(since.toISOString())]);
-        if (!mounted) return;
-        setOrders(currentOrders); setCashOpen(cash?.status === 'abierta'); setProducts(currentProducts); setCashSessionSales(currentCashSessionSales);
+        const current = await getDashboardSummary();
+        if (mounted) setSummary(current);
       }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar el dashboard.'); }
     };
     void load();
     void subscribeRestaurantData(load).then((cleanup) => { if (mounted) unsubscribe = cleanup; else cleanup(); }).catch((reason: Error) => setError(reason.message));
-    return () => { mounted = false; unsubscribe?.(); };
+    void subscribeProducts(load).then(cleanup => { if (mounted) unsubscribeCatalog = cleanup; else cleanup(); }).catch((reason: Error) => { if (mounted) setError(reason.message); });
+    return () => { mounted = false; unsubscribe?.(); unsubscribeCatalog?.(); };
   }, []);
 
-  const today = new Date().toDateString();
-  const todayOrders = orders.filter((order) => new Date(order.createdAt).toDateString() === today && order.status !== 'anulado');
-  const paid = todayOrders.filter((order) => order.status === 'pagado');
-  const sales = paid.reduce((sum, order) => sum + orderTotal(order), 0);
-  const average = paid.length ? sales / paid.length : 0;
-  const active = todayOrders.filter((order) => ['nuevo', 'preparando', 'listo'].includes(order.status));
-  const lowStock = products.filter((product) => product.stock <= 5).length;
-
-  const totals = new Map<string, number>();
-  paid.flatMap((order) => order.items).forEach((item) => totals.set(item.name, (totals.get(item.name) ?? 0) + item.quantity));
-  const ranking = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const todayOrders = summary.recent;
+  const sales = summary.sales, average = summary.paidCount ? sales / summary.paidCount : 0;
+  const lowStock = summary.lowStockCount, cashOpen = summary.cashOpen;
+  const ranking = summary.ranking;
+  const cashSessionSales = summary.cashSessionSales;
   const salesByDay = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - (6 - index));
+      const date = new Date(`${shiftDate(limaToday(), -(6-index))}T12:00:00-05:00`);
       return {
-        key: date.toLocaleDateString('en-CA'),
-        label: new Intl.DateTimeFormat('es-PE', { weekday: 'short' }).format(date).replace('.', ''),
-        shortDate: new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit' }).format(date),
+        key: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(date),
+        label: new Intl.DateTimeFormat('es-PE', { weekday: 'short', timeZone: 'America/Lima' }).format(date).replace('.', ''),
+        shortDate: new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', timeZone: 'America/Lima' }).format(date),
         total: 0,
         hasOpenCash: false,
       };
@@ -76,7 +63,7 @@ export default function Dashboard() {
 
     const indexByDate = new Map(days.map((day, index) => [day.key, index]));
     cashSessionSales.forEach((cashSale) => {
-      const key = new Date(cashSale.openedAt).toLocaleDateString('en-CA');
+      const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(cashSale.openedAt));
       const index = indexByDate.get(key);
       if (index !== undefined) {
         days[index].total += cashSale.total;
@@ -94,15 +81,15 @@ export default function Dashboard() {
       <div className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
         <div><p className="text-lg font-bold text-slate-700 dark:text-slate-200">¡Hola! 👋</p><h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">{companyName}</h1><p className="text-sm font-medium text-slate-500">Resumen de ventas, pedidos y cocina en tiempo real</p></div>
         <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"><CalendarDays className="h-5 w-5 text-blue-600"/><div><p className="text-xs font-bold text-slate-400">HOY</p><p className="text-sm font-bold text-slate-700 dark:text-slate-100">{new Intl.DateTimeFormat('es-PE',{weekday:'long',day:'2-digit',month:'long'}).format(new Date())}</p></div></div>
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"><CalendarDays className="h-5 w-5 text-blue-600"/><div><p className="text-xs font-bold text-slate-400">HOY</p><p className="text-sm font-bold text-slate-700 dark:text-slate-100">{new Intl.DateTimeFormat('es-PE',{weekday:'long',day:'2-digit',month:'long',timeZone:'America/Lima'}).format(new Date())}</p></div></div>
           <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm ${cashOpen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-red-300 bg-red-50 text-red-700'}`}><Store className="h-5 w-5"/><div><p className="text-xs font-black uppercase">Caja {cashOpen ? 'abierta' : 'cerrada'}</p><p className="text-xs opacity-75">Estado de operación</p></div></div>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={<CircleDollarSign />} label="Ventas de hoy" value={money.format(sales)} color="blue" note="Total cobrado hoy" />
-        <Metric icon={<ShoppingBag />} label="Pedidos cobrados" value={String(paid.length)} color="emerald" note="Pedidos completados" />
+        <Metric icon={<ShoppingBag />} label="Pedidos cobrados" value={String(summary.paidCount)} color="emerald" note="Pedidos completados" />
         <Metric icon={<Banknote />} label="Ticket promedio" value={money.format(average)} color="violet" note="Promedio por pedido" />
-        <Metric icon={<ChefHat />} label="En cocina" value={String(active.length)} color="orange" note={active.length ? "Pedidos activos" : "Sin pedidos"} />
+        <Metric icon={<ChefHat />} label="En cocina" value={String(summary.activeCount)} color="orange" note={summary.activeCount ? "Pedidos activos" : "Sin pedidos"} />
         <Metric icon={<Package />} label="Stock crítico" value={String(lowStock)} color="red" note={lowStock ? "Requiere atención" : "Stock saludable"} />
       </div>
 
@@ -143,9 +130,9 @@ export default function Dashboard() {
       </section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_1fr_0.9fr]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-slate-900 dark:text-white">Pedidos recientes</h2><span className="text-xs text-slate-400">Actualización automática</span></div><div className="space-y-2">{todayOrders.slice(0, 8).map((order) => <div key={order.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-800"><div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-sm font-black dark:bg-slate-800 dark:text-white">#{order.number}</div><div><p className="text-sm font-semibold text-slate-800 dark:text-white">{order.table ?? order.serviceType}</p><p className="flex items-center gap-1 text-xs capitalize text-slate-400"><Clock3 className="h-3 w-3" />{order.status}</p></div><strong className="dark:text-white">{money.format(orderTotal(order))}</strong></div>)}{!todayOrders.length && <p className="py-14 text-center text-sm text-slate-400">Todavía no hay pedidos registrados hoy.</p>}</div></section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 font-bold text-slate-900 dark:text-white">Productos más vendidos</h2><div className="space-y-3">{ranking.map(([name, quantity], index) => <div key={name} className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 dark:bg-blue-950">{index + 1}</span><span className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">{name}</span><strong className="text-sm dark:text-white">{quantity} und.</strong></div>)}{!ranking.length && <p className="py-14 text-center text-sm text-slate-400">El ranking aparecerá al cobrar ventas.</p>}</div></section>
-        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm dark:border-red-950 dark:bg-slate-900"><div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-5 w-5 text-red-500"/>Stock crítico</h2><span className="rounded-full bg-red-50 px-2 py-1 text-xs font-black text-red-600">{lowStock}</span></div><div className="space-y-2">{products.filter((product)=>product.stock<=5).slice(0,5).map((product)=><div key={product.id} className="flex items-center justify-between rounded-xl bg-red-50/70 px-3 py-3 dark:bg-red-950/20"><span className="truncate pr-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{product.name}</span><strong className="whitespace-nowrap text-xs text-red-600">{product.stock} und.</strong></div>)}{!lowStock && <p className="py-14 text-center text-sm text-slate-400">No hay productos con stock crítico.</p>}</div></section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-slate-900 dark:text-white">Pedidos recientes</h2><span className="text-xs text-slate-400">Actualización automática</span></div><div className="space-y-2">{todayOrders.slice(0, 8).map((order) => <div key={order.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-800"><div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-sm font-black dark:bg-slate-800 dark:text-white">#{order.number}</div><div><p className="text-sm font-semibold text-slate-800 dark:text-white">{order.table ?? order.serviceType}</p><p className="flex items-center gap-1 text-xs capitalize text-slate-400"><Clock3 className="h-3 w-3" />{order.status}</p></div><strong className="dark:text-white">{money.format(order.total)}</strong></div>)}{!todayOrders.length && <p className="py-14 text-center text-sm text-slate-400">Todavía no hay pedidos registrados hoy.</p>}</div></section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 font-bold text-slate-900 dark:text-white">Productos más vendidos</h2><div className="space-y-3">{ranking.map(({name, quantity}, index) => <div key={name} className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 dark:bg-blue-950">{index + 1}</span><span className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">{name}</span><strong className="text-sm dark:text-white">{quantity} und.</strong></div>)}{!ranking.length && <p className="py-14 text-center text-sm text-slate-400">El ranking aparecerá al cobrar ventas.</p>}</div></section>
+        <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm dark:border-red-950 dark:bg-slate-900"><div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-5 w-5 text-red-500"/>Stock crítico</h2><span className="rounded-full bg-red-50 px-2 py-1 text-xs font-black text-red-600">{lowStock}</span></div><div className="space-y-2">{summary.lowStock.map((product)=><div key={product.id} className="flex items-center justify-between rounded-xl bg-red-50/70 px-3 py-3 dark:bg-red-950/20"><span className="truncate pr-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{product.name}</span><strong className="whitespace-nowrap text-xs text-red-600">{product.stock} und.</strong></div>)}{!lowStock && <p className="py-14 text-center text-sm text-slate-400">No hay productos con stock crítico.</p>}</div></section>
       </div>
     </div>
   );
