@@ -2,6 +2,8 @@ import { supabase } from '../../lib/supabase';
 import { getBusinessContext } from '../restaurant-store';
 
 export type FiscalCompany = { ruc: string; legalName: string; address: string };
+export type FiscalReadiness = {canActivate:boolean;missing:string[];certificateValid:boolean;solReady:boolean;reviewed:boolean;productionEnabled:boolean};
+export type FiscalRegime = 'rer' | 'rmt' | 'general' | 'nuevo_rus';
 
 export function validateFiscalCompany(company: FiscalCompany): string[] {
   const errors: string[] = [];
@@ -65,3 +67,17 @@ export async function saveFiscalSol(username: string, password: string) {
   const { data, error } = await supabase.functions.invoke('electronic-billing-setup', { body: { empresaId, username, password } });
   if (error || data?.ok !== true) throw new Error('No se pudieron guardar las credenciales SOL. Comprueba el RUC, la sesión y los permisos.');
 }
+
+async function activationRequest(action: 'estado' | 'activar', extra: {regime?:FiscalRegime;confirmed?:boolean} = {}) {
+  const {empresaId,sucursalId}=await getBusinessContext();
+  const {data,error}=await supabase.functions.invoke('electronic-billing-setup',{body:{empresaId,branchId:sucursalId,action,...extra}});
+  if(error){
+    let message='No se pudo comprobar o activar la configuración SUNAT.';
+    if(error.context instanceof Response){const result=await error.context.json().catch(()=>null);if(typeof result?.error==='string')message=result.error;}
+    throw new Error(message);
+  }
+  if(data?.ok!==true)throw new Error('No se confirmó la operación.');
+  return data;
+}
+export async function getFiscalReadiness():Promise<FiscalReadiness>{return activationRequest('estado');}
+export async function activateFiscalCompany(regime:FiscalRegime,confirmed:boolean){return activationRequest('activar',{regime,confirmed});}
