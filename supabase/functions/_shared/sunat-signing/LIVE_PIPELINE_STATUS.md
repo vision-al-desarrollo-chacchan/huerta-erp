@@ -26,3 +26,9 @@ Verificación remota: clave dedicada existente y de longitud correcta sin mostra
 El transporte implementado admite facturas y boletas gravadas al 18% y al contado. La firma del resumen, el envío del ticket, su consulta y el rechazo de CDR ajenos tienen tres pruebas locales. El resumen ficticio firmado pasó el XSD oficial UBLPE-SummaryDocuments-1.0.xsd del paquete SUNAT con checksum 5cac9d9353521340fbc15d23f465a4946b004535b9ff411541c87da01694dbd5. Se envió un resumen ficticio al servicio beta real: RC-20261012-42793, ticket 1791863156402, CDR aceptado código 0. Esta prueba directa usa curl con TLS, no Auth/PostgREST/Storage del endpoint desplegado. Notas de crédito, débito, bajas, descuentos, operaciones exoneradas/gratuitas, detracciones y crédito no están cubiertos. No habilitar ni anunciar facturación completa con este estado.
 
 Fuentes: https://supabase.com/docs/guides/database/vault ; https://cpe.sunat.gob.pe/sites/default/files/inline-files/manual_programador%20%281%29.pdf ; https://cpe.sunat.gob.pe/sistema_emision/see_contribuyente
+
+## Activación por empresa — 2026-10-13
+
+El formulario incorpora revisión de requisitos, selección de régimen, confirmación del administrador y un botón de activación conectado al backend. Los requisitos se calculan con los datos guardados, no con los campos aún sin guardar. La revisión fiscal se vincula al RUC y la huella del certificado de esa empresa; ni el navegador ni el personal pueden aprobarla o llamar directamente a la RPC de activación. El envío vuelve a verificar esa aprobación antes de preparar un comprobante.
+
+La aprobación del piloto y el interruptor global siguen pendientes. No se aprobó ni activó ninguna empresa. La primera emisión real requiere validar la empresa, certificado registrado y credenciales SOL. Los tres casos de readiness y tres grupos SQL de autorización/activación pasaron localmente. El formulario y las nuevas funciones se verifican por separado de la prueba beta.

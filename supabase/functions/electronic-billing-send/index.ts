@@ -62,15 +62,17 @@ Deno.serve(createLiveHandler({
  },
  async prepare(doc:Doc){
   if(!['factura','boleta'].includes(doc.tipo_documento))throw new Error('Tipo de documento no implementado.');
-  const [{data:company,error:ce},{data:cfg,error:fe},{data:certificate,error:ke},{data:sol,error:se},{data:order,error:oe},{data:items,error:ie}] = await Promise.all([
+  const [{data:company,error:ce},{data:cfg,error:fe},{data:certificate,error:ke},{data:sol,error:se},{data:order,error:oe},{data:items,error:ie},{data:review,error:re}] = await Promise.all([
    admin.from('rest_empresas').select('ruc,nombre,direccion,activa').eq('id',doc.empresa_id).single(),
    admin.from('ef_configuraciones').select('activo,ambiente,proveedor').eq('empresa_id',doc.empresa_id).single(),
-   admin.from('ef_sunat_certificados').select('ruc,envelope,key_id').eq('empresa_id',doc.empresa_id).single(),
+   admin.from('ef_sunat_certificados').select('ruc,envelope,key_id,huella').eq('empresa_id',doc.empresa_id).single(),
    admin.from('ef_sunat_sol').select('ruc,envelope,key_id').eq('empresa_id',doc.empresa_id).single(),
    admin.from('rest_pedidos').select('empresa_id,sucursal_id,estado,total').eq('id',doc.pedido_id).single(),
    admin.from('rest_pedido_items').select('nombre,cantidad,precio_unitario').eq('pedido_id',doc.pedido_id),
+   admin.from('ef_sunat_habilitaciones').select('ruc,certificado_huella,aprobada,revisada_at').eq('empresa_id',doc.empresa_id).maybeSingle(),
   ]);
   if(ce||fe||ke||se||oe||ie||!company?.activa||!cfg?.activo||cfg.proveedor!=='sunat'||cfg.ambiente!=='produccion'||certificate?.ruc!==company.ruc||sol?.ruc!==company.ruc||order?.empresa_id!==doc.empresa_id||order?.sucursal_id!==doc.sucursal_id||order?.estado==='anulado'||!items?.length)throw new Error('Configuración incompleta.');
+  if(re||!review?.aprobada||!review.revisada_at||review.ruc!==company.ruc||review.certificado_huella!==certificate.huella)throw new Error('Empresa o certificado pendientes de validación.');
   const total=items.reduce((sum,item)=>sum+Math.round(Number(item.cantidad)*Number(item.precio_unitario)*100),0);
   if(total!==Math.round(Number(doc.total)*100)||total!==Math.round(Number(order.total)*100))throw new Error('Los montos no coinciden.');
   const receiver=doc.receptor_documento??'';

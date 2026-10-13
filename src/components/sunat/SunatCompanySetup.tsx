@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getBillingConfiguration, type BillingConfig } from '../../services/electronic-billing';
-import { getFiscalCompany, saveFiscalCompany, saveFiscalSol, uploadFiscalCertificate, type FiscalCompany } from '../../services/sunat/company-setup';
+import { activateFiscalCompany, getFiscalReadiness, getFiscalCompany, saveFiscalCompany, saveFiscalSol, uploadFiscalCertificate, type FiscalCompany, type FiscalReadiness, type FiscalRegime } from '../../services/sunat/company-setup';
 
 const input = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 disabled:bg-slate-100';
 const button = 'rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50';
@@ -13,6 +13,9 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
   const [password, setPassword] = useState('');
   const [solUser, setSolUser] = useState('');
   const [solPassword, setSolPassword] = useState('');
+  const [readiness,setReadiness]=useState<FiscalReadiness|null>(null);
+  const [regime,setRegime]=useState<FiscalRegime|''>('');
+  const [confirmed,setConfirmed]=useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -20,8 +23,9 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     let mounted = true;
-    void Promise.all([getFiscalCompany(), getBillingConfiguration()]).then(([result, billing]) => {
+    void Promise.all([getFiscalCompany(), getBillingConfiguration()]).then(async ([result, billing]) => {
       if (mounted) { setCompany(result.company); setCanEdit(result.canEdit); setConfig(billing); setSolUser(billing.solUser); }
+      if(result.canEdit){const state=await getFiscalReadiness();if(mounted)setReadiness(state);}
     }).catch(() => { if (mounted) setError('No se pudo cargar la configuración de esta empresa.'); });
     return () => { mounted = false; };
   }, []);
@@ -31,6 +35,7 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
     try {
       await saveFiscalCompany(company);
       await onSaved();
+      setReadiness(await getFiscalReadiness());
       setNotice('Datos fiscales guardados para esta empresa. La emisión real continúa desactivada.');
     } catch (e) { setError(e instanceof Error ? e.message : 'No se pudieron guardar los datos.'); }
     finally { setBusy(false); }
@@ -42,6 +47,7 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
       await uploadFiscalCertificate(file, password);
       setConfig(await getBillingConfiguration());
       await onSaved();
+      setReadiness(await getFiscalReadiness());
       setNotice('Certificado validado y guardado cifrado para esta empresa. La emisión no se activa automáticamente.');
     } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo cargar el certificado.'); }
     finally {
@@ -58,9 +64,23 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
       await saveFiscalSol(solUser, solPassword);
       setConfig(await getBillingConfiguration());
       await onSaved();
+      setReadiness(await getFiscalReadiness());
       setNotice('Credenciales SOL guardadas cifradas para esta empresa. La emisión real continúa desactivada.');
     } catch (e) { setError(e instanceof Error ? e.message : 'No se pudieron guardar las credenciales.'); }
     finally { setSolPassword(''); setBusy(false); }
+  };
+  const reviewRequirements=async()=>{
+    setBusy(true);setError('');setNotice('');
+    try{setReadiness(await getFiscalReadiness());setNotice('Requisitos comprobados con los datos guardados de esta empresa y sucursal.');}
+    catch(e){setError(e instanceof Error?e.message:'No se pudo comprobar la configuración.');}
+    finally{setBusy(false);}
+  };
+  const activate=async()=>{
+    if(!regime||regime==='nuevo_rus'||!confirmed||!canEdit)return;
+    setBusy(true);setError('');setNotice('');
+    try{await activateFiscalCompany(regime,confirmed);setConfig(await getBillingConfiguration());await onSaved();setReadiness(await getFiscalReadiness());setNotice('Emisión electrónica activada para esta empresa.');}
+    catch(e){setError(e instanceof Error?e.message:'No se pudo activar la emisión.');}
+    finally{setBusy(false);}
   };
   return <section className="space-y-5 rounded-2xl border bg-white p-5 md:p-6">
     <div><h2 className="text-xl font-black text-slate-950">Configura la facturación de tu empresa</h2><p className="mt-1 text-sm text-slate-600">Cada empresa utiliza su propio RUC, certificado y series. Guardar estos datos no activa la emisión.</p></div>
@@ -105,8 +125,14 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
       <p>Certificado: {certificateCurrent ? 'configurado y vigente' : 'pendiente o vencido'}.</p>
       <p>Series: configura boletas y facturas en «Series por sucursal».</p>
       <p>Credenciales SOL: {config?.solPasswordConfigured ? 'guardadas; acceso SUNAT pendiente de verificar' : 'pendientes'}.</p>
-      <p>Primera emisión real: pendiente de validar con una empresa habilitada. Solo se han probado datos ficticios.</p>
-      <button type="button" disabled className={button}>Activación real pendiente</button>
+      <p>{config?.active?'Emisión electrónica activada para esta empresa. Consulta el estado SUNAT de cada comprobante.':'Primera emisión real: pendiente de validar con una empresa habilitada. Solo se han probado datos ficticios.'}</p>
+      {readiness&&readiness.missing.length>0&&<div><p className="font-bold">Falta completar:</p><ul className="mt-2 list-disc space-y-1 pl-5">{readiness.missing.map(item=><li key={item}>{item}</li>)}</ul></div>}
+      <fieldset disabled={busy||!canEdit||config?.active} className="space-y-3 pt-3">
+        <Field label="Régimen tributario del negocio"><select className={input} value={regime} onChange={e=>{setRegime(e.target.value as FiscalRegime|'');setConfirmed(false);}}><option value="">Selecciona tu régimen</option><option value="nuevo_rus">Nuevo RUS (solo pruebas en este módulo)</option><option value="rer">Régimen Especial de Renta</option><option value="rmt">Régimen MYPE Tributario</option><option value="general">Régimen General</option></select></Field>
+        {regime==='nuevo_rus'?<p className="font-semibold text-amber-800">Conserva las pruebas ficticias. Este flujo de facturas y boletas no se activa para Nuevo RUS.</p>:<label className="flex items-start gap-2"><input type="checkbox" className="mt-1" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>Confirmo que el negocio está habilitado como emisor y que su certificado está registrado en SUNAT.</span></label>}
+      </fieldset>
+      <div className="flex flex-wrap gap-3 pt-2"><button type="button" disabled={busy||!canEdit} className="rounded-xl border px-5 py-3 font-bold disabled:opacity-50" onClick={()=>void reviewRequirements()}>Revisar requisitos</button><button type="button" disabled={busy||!canEdit||!readiness?.canActivate||!confirmed||!regime||regime==='nuevo_rus'||config?.active} className={button} onClick={()=>void activate()}>{config?.active?'Emisión activada':'Activar emisión electrónica'}</button></div>
+      {!readiness?.canActivate&&<p className="text-xs text-slate-500">El botón se habilita al completar los requisitos y validar la primera emisión real de esta empresa.</p>}
     </div>
   </section>;
 }

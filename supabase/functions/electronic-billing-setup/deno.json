@@ -1,1 +1,1 @@
-{"imports":{"@supabase/supabase-js":"npm:@supabase/supabase-js@2.112.2"}}
+{"imports":{"@supabase/supabase-js":"npm:@supabase/supabase-js@2.112.2","xml-crypto":"npm:xml-crypto@6.3.3","@xmldom/xmldom":"npm:@xmldom/xmldom@0.9.12","node-forge":"npm:node-forge@1.4.0"}}
