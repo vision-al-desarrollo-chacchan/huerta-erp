@@ -1,3 +1,4 @@
+import LoadMoreRecords from '../components/LoadMoreRecords';
 import { useEffect, useMemo, useState } from 'react';
 import { archiveRecord, createClient, getClients, type Client } from '../services/erp-store';
 
@@ -7,8 +8,15 @@ export default function Clientes() {
   const [rows, setRows] = useState<Client[]>([]), [loading, setLoading] = useState(true), [saving, setSaving] = useState(false);
   const [error, setError] = useState(''), [search, setSearch] = useState('');
   const [form, setForm] = useState({ tipo_documento: 'DNI', numero_documento: '', nombre: '', telefono: '', email: '', direccion: '' });
-  const load = async () => { try { setRows(await getClients()); setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudieron cargar los clientes.'); } finally { setLoading(false); } };
-  useEffect(() => { void getClients().then(data => { setRows(data); setLoading(false); }).catch(e => { setError(e instanceof Error ? e.message : 'No se pudieron cargar los clientes.'); setLoading(false); }); }, []);
+  const load = async () => { try { setRows(await getClients(0, search)); setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudieron cargar los clientes.'); } finally { setLoading(false); } };
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      setLoading(true);
+      void getClients(0, search).then(data => { if (active) { setRows(data); setLoading(false); } }).catch(e => { if (active) { setError(e instanceof Error ? e.message : 'No se pudieron cargar los clientes.'); setLoading(false); } });
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [search]);
   const filtered = useMemo(() => rows.filter(r => r.activo && `${r.nombre} ${r.numero_documento ?? ''} ${r.telefono ?? ''}`.toLowerCase().includes(search.toLowerCase())), [rows, search]);
   const save = async () => {
     if (!form.nombre.trim()) return setError('Ingresa el nombre del cliente.');
@@ -32,5 +40,5 @@ export default function Clientes() {
       <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 text-xs font-black uppercase text-slate-600"><tr><th className="p-4">Cliente</th><th>Documento</th><th>Contacto</th><th>Acción</th></tr></thead><tbody className="divide-y">
       {loading?<tr><td colSpan={4} className="p-10 text-center">Cargando...</td></tr>:filtered.length===0?<tr><td colSpan={4} className="p-10 text-center text-slate-500">Aún no hay clientes.</td></tr>:filtered.map(r=><tr key={r.id}><td className="p-4 font-bold text-slate-900">{r.nombre}</td><td>{r.tipo_documento} {r.numero_documento||'—'}</td><td>{r.telefono||r.email||'—'}</td><td><button className="font-bold text-red-600" onClick={async()=>{if(confirm('¿Archivar este cliente?')){await archiveRecord('erp_clientes',r.id);await load();}}}>Archivar</button></td></tr>)}</tbody></table></div>
     </section>
-  </div>;
+  <LoadMoreRecords rows={rows} key={search} load={page => getClients(page, search)} onLoaded={setRows}/></div>;
 }

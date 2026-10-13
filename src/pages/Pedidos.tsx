@@ -1,3 +1,4 @@
+import LoadMoreRecords from '../components/LoadMoreRecords';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Eye, X } from 'lucide-react';
 import { cancelOrder, getOrders, orderTotal, subscribeRestaurantData } from '../services/restaurant-store';
@@ -16,7 +17,7 @@ export default function Pedidos() {
   const [selected, setSelected] = useState<RestaurantOrder | null>(null);
   const { notify } = useNotification();
 
-  const load = useCallback(() => getOrders()
+  const load = useCallback(() => getOrders({ page: 0, status: filter })
     .then((data) => {
       setRows(data);
       setSelected((current) => current ? data.find((row) => row.id === current.id) ?? null : null);
@@ -26,7 +27,7 @@ export default function Pedidos() {
       const message = userErrorMessage(reason, 'No se pudieron cargar los pedidos.');
       setError(message);
       notify(message, 'error');
-    }), [notify]);
+    }), [notify, filter]);
 
   useEffect(() => {
     let active = true;
@@ -37,7 +38,7 @@ export default function Pedidos() {
       if (!active) return;
       setLive(status === 'connected');
       if (status === 'error') notify('Se perdió la actualización en tiempo real. Intentando reconectar…', 'error');
-    }).then((cleanup) => { unsubscribe = cleanup; })
+    }).then((cleanup) => { if (active) unsubscribe = cleanup; else cleanup(); })
       .catch((reason: unknown) => {
         const message = userErrorMessage(reason, 'No se pudo iniciar la actualización en tiempo real.');
         setError(message);
@@ -74,6 +75,7 @@ export default function Pedidos() {
       <td><span className={`rounded-full px-3 py-1 text-xs font-black ${row.status === 'anulado' ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>{row.status}</span></td><td>{row.paymentMethod || 'Pendiente'}</td><td className="font-black">{money.format(orderTotal(row))}</td><td>{row.status !== 'anulado' && <button onClick={(event) => { event.stopPropagation(); void annul(row); }} className="font-black text-red-600">Anular</button>}</td>
     </tr>)}</tbody></table></section>
 
+    <LoadMoreRecords key={filter} rows={rows} load={page => getOrders({ page, status: filter })} onLoaded={setRows}/>
     {selected && <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/50" role="dialog" aria-modal="true" aria-label={`Detalle del pedido ${selected.number}`} onClick={() => setSelected(null)}>
       <aside className="flex h-full w-full max-w-lg flex-col bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <header className="flex items-start justify-between border-b p-5"><div><p className="text-xs font-black uppercase text-blue-600">Detalle del pedido</p><h2 className="text-2xl font-black text-slate-950">#{String(selected.number).padStart(3, '0')} · {selected.table || selected.customer || selected.serviceType}</h2><p className="mt-1 text-sm text-slate-500">{new Date(selected.createdAt).toLocaleString('es-PE')}</p></div><button type="button" onClick={() => setSelected(null)} className="rounded-xl bg-slate-100 p-2 text-slate-600" aria-label="Cerrar detalle"><X className="h-5 w-5" /></button></header>
