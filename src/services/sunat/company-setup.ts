@@ -58,3 +58,10 @@ export async function uploadFiscalCertificate(file: File, password: string) {
     if (data?.ok !== true) throw new Error('No se confirmó el guardado del certificado. Consulta su estado antes de repetir.');
   } finally { bytes.fill(0); }
 }
+
+export async function saveFiscalSol(username: string, password: string) {
+  if (!/^[A-Za-z0-9]{1,30}$/.test(username) || !password || password.length > 1024) throw new Error('Ingresa un usuario SOL válido y su clave.');
+  const { empresaId } = await getBusinessContext();
+  const { data, error } = await supabase.functions.invoke('electronic-billing-setup', { body: { empresaId, username, password } });
+  if (error || data?.ok !== true) throw new Error('No se pudieron guardar las credenciales SOL. Comprueba el RUC, la sesión y los permisos.');
+}

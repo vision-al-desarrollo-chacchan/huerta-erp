@@ -6,6 +6,7 @@ import { SignedXml } from 'xml-crypto';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 
 const UBL = 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2';
+const SUMMARY = 'urn:sunat:names:specification:ubl:peru:schema:xsd:SummaryDocuments-1';
 const EXT = 'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2';
 const CAC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2';
 const CBC = 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2';
@@ -19,11 +20,19 @@ const one = (nodes) => { if (nodes.length !== 1) throw new Error('Estructura XML
 function parse(xml) {
   if (typeof xml !== 'string' || Buffer.byteLength(xml) > 5_000_000 || /<!DOCTYPE|<!ENTITY/i.test(xml)) throw new Error('XML no admitido.');
   const document = new DOMParser({ onError: () => { throw new Error('XML mal formado.'); } }).parseFromString(xml, 'application/xml');
-  if (!document.documentElement || document.documentElement.namespaceURI !== UBL || document.documentElement.localName !== 'Invoice') throw new Error('Se requiere Invoice UBL.');
+  const root = document.documentElement;
+  if (!root || !((root.namespaceURI === UBL && root.localName === 'Invoice') || (root.namespaceURI === SUMMARY && root.localName === 'SummaryDocuments'))) throw new Error('Se requiere Invoice o SummaryDocuments SUNAT.');
   return document;
 }
 function issuer(document) {
   const root = document.documentElement;
+  if (root.namespaceURI === SUMMARY) {
+    const supplier = one(children(root, CAC, 'AccountingSupplierParty'));
+    const ruc = one(children(supplier, CBC, 'CustomerAssignedAccountID')).textContent;
+    if (!/^\d{11}$/.test(ruc) || one(children(supplier, CBC, 'AdditionalAccountID')).textContent !== '6') throw new Error('RUC del resumen inválido.');
+    const party = one(children(supplier, CAC, 'Party'));
+    return { ruc, name: one(children(one(children(party, CAC, 'PartyLegalEntity')), CBC, 'RegistrationName')).textContent };
+  }
   const party = one(children(one(children(root, CAC, 'AccountingSupplierParty')), CAC, 'Party'));
   const id = one(children(one(children(party, CAC, 'PartyIdentification')), CBC, 'ID'));
   if (id.getAttribute('schemeID') !== '6' || !/^\d{11}$/.test(id.textContent)) throw new Error('RUC emisor inválido.');
@@ -71,7 +80,7 @@ export function signSunatXml({ xml, certificatePem, privateKeyPem }) {
   add(add(add(signature, CAC, 'cac:DigitalSignatureAttachment'), CAC, 'cac:ExternalReference'), CBC, 'cbc:URI', '#' + SIGNATURE_ID);
   root.insertBefore(signature, one(children(root, CAC, 'AccountingSupplierParty')));
   const signer = new SignedXml({ privateKey: key, publicCert: certificatePem, signatureAlgorithm: RSA_SHA256, canonicalizationAlgorithm: C14N });
-  signer.addReference({ xpath: "/*[local-name()='Invoice']", transforms: [DS + 'enveloped-signature', C14N], digestAlgorithm: SHA256, isEmptyUri: true });
+  signer.addReference({ xpath: `/*[local-name()='${root.localName}']`, transforms: [DS + 'enveloped-signature', C14N], digestAlgorithm: SHA256, isEmptyUri: true });
   signer.computeSignature(new XMLSerializer().serializeToString(document), { prefix: 'ds', attrs: { Id: SIGNATURE_ID }, location: { reference: "//*[local-name()='ExtensionContent']", action: 'append' } });
   const signedXml = signer.getSignedXml();
   verifySunatXml(signedXml, certificatePem);

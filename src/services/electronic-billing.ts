@@ -34,7 +34,7 @@ export type BillingDocument = {
   documentType: BillingDocumentType | 'anulacion';
   series: string;
   number: number;
-  status: 'pendiente' | 'enviando' | 'aceptado' | 'observado' | 'rechazado' | 'anulado' | 'error';
+  status: 'pendiente' | 'enviando' | 'aceptado' | 'observado' | 'rechazado' | 'anulado' | 'error' | 'incierto';
   total: number;
   receiverName?: string;
   sunatCode?: string;
@@ -115,10 +115,24 @@ export async function getBillingDocuments(): Promise<BillingDocument[]> {
   return (data ?? []).map(row => ({ id: row.id, orderId: row.pedido_id ?? undefined, documentType: row.tipo_documento, series: row.serie, number: Number(row.numero), status: row.estado, total: Number(row.total), receiverName: row.receptor_nombre ?? undefined, sunatCode: row.codigo_sunat ?? undefined, sunatMessage: row.mensaje_sunat ?? undefined, attempts: row.intentos, xmlPath: row.xml_path ?? undefined, pdfPath: row.pdf_path ?? undefined, cdrPath: row.cdr_path ?? undefined, createdAt: row.created_at }));
 }
 
-export async function retryBillingDocument(documentId: string) {
-  const { data, error } = await supabase.functions.invoke('electronic-billing-send', { body: { documentId } });
-  if (error) throw new Error(error.message);
+export async function retryBillingDocument(documentId: string, action?: 'consultar') {
+  const { data, error } = await supabase.functions.invoke('electronic-billing-send', { body: { documentId, ...(action ? { action } : {}) } });
+  if (error) {
+    let message = 'No se pudo confirmar el envío. Consulta el estado antes de repetir.';
+    if (error.context instanceof Response) {
+      const result = await error.context.json().catch(() => null);
+      if (typeof result?.error === 'string') message = result.error;
+      else if (typeof result?.mensaje === 'string') message = result.mensaje;
+    }
+    throw new Error(message);
+  }
   return data;
+}
+
+export async function getBillingArtifactUrl(path: string) {
+  const { data, error } = await supabase.storage.from('sunat-comprobantes').createSignedUrl(path, 60);
+  if (error || !data?.signedUrl) throw new Error('No se pudo abrir el archivo de esta empresa.');
+  return data.signedUrl;
 }
 
 export async function issueOrderDocument(input: { orderId: string; type: 'boleta' | 'factura'; total: number; receiverDocument?: string; receiverName?: string }) {

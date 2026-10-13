@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getBillingConfiguration, type BillingConfig } from '../../services/electronic-billing';
-import { getFiscalCompany, saveFiscalCompany, uploadFiscalCertificate, type FiscalCompany } from '../../services/sunat/company-setup';
+import { getFiscalCompany, saveFiscalCompany, saveFiscalSol, uploadFiscalCertificate, type FiscalCompany } from '../../services/sunat/company-setup';
 
 const input = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 disabled:bg-slate-100';
 const button = 'rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50';
@@ -11,6 +11,8 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
   const [canEdit, setCanEdit] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
+  const [solUser, setSolUser] = useState('');
+  const [solPassword, setSolPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -19,7 +21,7 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
   useEffect(() => {
     let mounted = true;
     void Promise.all([getFiscalCompany(), getBillingConfiguration()]).then(([result, billing]) => {
-      if (mounted) { setCompany(result.company); setCanEdit(result.canEdit); setConfig(billing); }
+      if (mounted) { setCompany(result.company); setCanEdit(result.canEdit); setConfig(billing); setSolUser(billing.solUser); }
     }).catch(() => { if (mounted) setError('No se pudo cargar la configuración de esta empresa.'); });
     return () => { mounted = false; };
   }, []);
@@ -49,6 +51,17 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
     }
   };
   const certificateCurrent = Boolean(config?.certificateConfigured && config.certificateExpiresAt && Date.parse(config.certificateExpiresAt + 'T23:59:59Z') > checkedAt);
+  const saveSol = async () => {
+    if (!canEdit) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await saveFiscalSol(solUser, solPassword);
+      setConfig(await getBillingConfiguration());
+      await onSaved();
+      setNotice('Credenciales SOL guardadas cifradas para esta empresa. La emisión real continúa desactivada.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'No se pudieron guardar las credenciales.'); }
+    finally { setSolPassword(''); setBusy(false); }
+  };
   return <section className="space-y-5 rounded-2xl border bg-white p-5 md:p-6">
     <div><h2 className="text-xl font-black text-slate-950">Configura la facturación de tu empresa</h2><p className="mt-1 text-sm text-slate-600">Cada empresa utiliza su propio RUC, certificado y series. Guardar estos datos no activa la emisión.</p></div>
     <div className="rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-900">Emisión real pendiente de validación. La prueba beta usa datos ficticios y no tiene validez tributaria. Si tu negocio está en Nuevo RUS, conserva las pruebas ficticias y no configures facturas reales.</div>
@@ -76,13 +89,23 @@ export default function SunatCompanySetup({ onSaved }: { onSaved: () => Promise<
         <p className="text-xs text-slate-500">El servidor comprueba contraseña, vigencia y correspondencia con el RUC. La contraseña y el archivo se guardan cifrados; el vencimiento se obtiene del certificado.</p>
         <button type="button" disabled={!file || busy || !canEdit} className={button} onClick={() => void upload()}>Validar y guardar certificado</button>
       </fieldset>
+      <fieldset disabled={busy || !canEdit} className="space-y-4 border-t pt-5">
+        <legend className="pt-5 font-black text-slate-950">3. Credenciales SOL</legend>
+        <p className="text-sm text-slate-600">{config?.solPasswordConfigured ? 'Clave SOL configurada. Introduce una nueva clave solo para reemplazarla.' : 'Usa las credenciales autorizadas del negocio emisor.'}</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Usuario SOL (sin anteponer el RUC)"><input className={input} autoComplete="off" maxLength={30} value={solUser} onChange={e => setSolUser(e.target.value.toUpperCase())} /></Field>
+          <Field label="Clave SOL"><input type="password" autoComplete="new-password" className={input} value={solPassword} onChange={e => setSolPassword(e.target.value)} /></Field>
+        </div>
+        <button type="button" disabled={!solUser || !solPassword || busy || !canEdit} className={button} onClick={() => void saveSol()}>Guardar credenciales SOL</button>
+      </fieldset>
     </>}
     <div className="space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
-      <h3 className="font-black">3. Preparación para emitir</h3>
+      <h3 className="font-black">4. Preparación para emitir</h3>
       <p>Datos fiscales: {company?.ruc && company.legalName && company.address ? 'registrados; requieren verificación SUNAT' : 'pendientes'}.</p>
       <p>Certificado: {certificateCurrent ? 'configurado y vigente' : 'pendiente o vencido'}.</p>
       <p>Series: configura boletas y facturas en «Series por sucursal».</p>
-      <p>Credenciales SOL y envío real: pendientes de integración y validación.</p>
+      <p>Credenciales SOL: {config?.solPasswordConfigured ? 'guardadas; acceso SUNAT pendiente de verificar' : 'pendientes'}.</p>
+      <p>Primera emisión real: pendiente de validar con una empresa habilitada. Solo se han probado datos ficticios.</p>
       <button type="button" disabled className={button}>Activación real pendiente</button>
     </div>
   </section>;
