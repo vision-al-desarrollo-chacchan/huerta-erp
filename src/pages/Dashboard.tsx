@@ -31,6 +31,7 @@ export default function Dashboard() {
     };
   }, []);
   useEffect(() => {
+    let mounted = true;
     let unsubscribe: (() => void) | undefined;
     const load = async () => {
       try {
@@ -38,13 +39,14 @@ export default function Dashboard() {
         since.setHours(0, 0, 0, 0);
         since.setDate(since.getDate() - 6);
         const [currentOrders, cash, currentProducts, currentCashSessionSales] = await Promise.all([getOrders(), getCashSession(), getProducts(), getCashSessionSales(since.toISOString())]);
+        if (!mounted) return;
         setOrders(currentOrders); setCashOpen(cash?.status === 'abierta'); setProducts(currentProducts); setCashSessionSales(currentCashSessionSales);
       }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar el dashboard.'); }
     };
     void load();
-    void subscribeRestaurantData(load).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: Error) => setError(reason.message));
-    return () => unsubscribe?.();
+    void subscribeRestaurantData(load).then((cleanup) => { if (mounted) unsubscribe = cleanup; else cleanup(); }).catch((reason: Error) => setError(reason.message));
+    return () => { mounted = false; unsubscribe?.(); };
   }, []);
 
   const today = new Date().toDateString();

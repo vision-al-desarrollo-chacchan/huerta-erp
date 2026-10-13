@@ -108,9 +108,9 @@ export async function saveBillingSeries(series: BillingSeries[]) {
   if (error) throw error;
 }
 
-export async function getBillingDocuments(): Promise<BillingDocument[]> {
+export async function getBillingDocuments(page = 0): Promise<BillingDocument[]> {
   const { empresaId, sucursalId } = await getBusinessContext();
-  const { data, error } = await supabase.from('ef_documentos').select('*').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).order('created_at', { ascending: false }).limit(250);
+  const { data, error } = await supabase.from('ef_documentos').select('id,pedido_id,tipo_documento,serie,numero,estado,total,receptor_nombre,codigo_sunat,mensaje_sunat,intentos,xml_path,pdf_path,cdr_path,created_at').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).order('created_at', { ascending: false }).order('id', { ascending: false }).range(page * 100, page * 100 + 99);
   if (error) throw error;
   return (data ?? []).map(row => ({ id: row.id, orderId: row.pedido_id ?? undefined, documentType: row.tipo_documento, series: row.serie, number: Number(row.numero), status: row.estado, total: Number(row.total), receiverName: row.receptor_nombre ?? undefined, sunatCode: row.codigo_sunat ?? undefined, sunatMessage: row.mensaje_sunat ?? undefined, attempts: row.intentos, xmlPath: row.xml_path ?? undefined, pdfPath: row.pdf_path ?? undefined, cdrPath: row.cdr_path ?? undefined, createdAt: row.created_at }));
 }

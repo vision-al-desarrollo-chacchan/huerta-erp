@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChefHat, Clock3 } from 'lucide-react';
-import { getOrders, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
+import { getOrders, kitchenOrderStates, mergeOrderChanges, type RestaurantChange, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
 import type { OrderStatus, RestaurantOrder } from '../types/restaurant';
 import { useNotification } from '../context/notification-context';
 import { userErrorMessage } from '../lib/errors';
@@ -20,7 +20,7 @@ export default function Cocina() {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     let active = true;
-    const load = () => getOrders().then((data) => { if (active) { setOrders(data); setError(''); } }).catch((reason: unknown) => {
+    const load = (change?: RestaurantChange) => getOrders({ states: kitchenOrderStates, ...(change && !change.reload ? { ids: change.orderIds } : {}) }).then((data) => { if (active) { setOrders(current => change && !change.reload ? mergeOrderChanges(current, data, change.orderIds) : data); setError(''); } }).catch((reason: unknown) => {
       const message = userErrorMessage(reason, 'No se pudieron cargar las comandas.');
       if (active) { setError(message); notify(message, 'error'); }
     });
@@ -29,7 +29,7 @@ export default function Cocina() {
       if (!active) return;
       setRealtimeConnected(status === 'connected');
       if (status === 'error') notify('Se perdió la actualización en tiempo real. Intentando reconectar…', 'error');
-    }).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: unknown) => {
+    }).then((cleanup) => { if (active) unsubscribe = cleanup; else cleanup(); }).catch((reason: unknown) => {
       const message = userErrorMessage(reason, 'No se pudo iniciar la actualización en tiempo real.');
       setError(message); notify(message, 'error');
     });

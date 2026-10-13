@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Pencil, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
-import { addItemsToOrder, createOrder, createProduct, deactivateProduct, getCashSession, getOrders, getProducts, subscribeProducts, subscribeRestaurantData, updateProduct } from '../services/restaurant-store';
+import { addItemsToOrder, createOrder, createProduct, deactivateProduct, getCashSession, getOrders, activeOrderStates, mergeOrderChanges, type RestaurantChange, getProducts, subscribeProducts, subscribeRestaurantData, updateProduct } from '../services/restaurant-store';
 import type { OrderItem, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
 import { enqueueOrderPrint } from '../services/print-queue';
 import { useNotification } from '../context/notification-context';
@@ -37,18 +37,18 @@ export default function Ventas() {
     const loadProducts = () => getProducts()
       .then((rows) => { if (active) setProducts(rows); })
       .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudieron actualizar los productos.'), 'error'); });
-    const loadOrders = () => getOrders()
-      .then((rows) => { if (active) setOrders(rows); })
+    const loadOrders = (change?: RestaurantChange) => getOrders({ states: activeOrderStates, ...(change && !change.reload ? { ids: change.orderIds } : {}) })
+      .then((rows) => { if (active) setOrders(current => change && !change.reload ? mergeOrderChanges(current, rows, change.orderIds) : rows); })
       .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudieron actualizar las mesas.'), 'error'); });
-    Promise.all([getProducts(), getOrders()])
+    Promise.all([getProducts(), getOrders({ states: activeOrderStates })])
       .then(([productRows, orderRows]) => { if (active) { setProducts(productRows); setOrders(orderRows); } })
       .catch((reason: unknown) => { if (active) { const message = userErrorMessage(reason, 'No se pudo cargar el POS.'); setNotice(message); notify(message, 'error'); } })
       .finally(() => { if (active) setLoading(false); });
     void subscribeProducts(loadProducts)
-      .then((cleanup) => { unsubscribeProducts = cleanup; })
+      .then((cleanup) => { if (active) unsubscribeProducts = cleanup; else cleanup(); })
       .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudo activar la actualización del catálogo.'), 'error'); });
     void subscribeRestaurantData(loadOrders)
-      .then((cleanup) => { unsubscribeOrders = cleanup; })
+      .then((cleanup) => { if (active) unsubscribeOrders = cleanup; else cleanup(); })
       .catch((reason: unknown) => { if (active) notify(userErrorMessage(reason, 'No se pudo activar la actualización de mesas.'), 'error'); });
     return () => { active = false; unsubscribeProducts?.(); unsubscribeOrders?.(); };
   }, [notify]);

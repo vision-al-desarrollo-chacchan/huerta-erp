@@ -1,3 +1,4 @@
+import { createRefreshScheduler } from '../lib/refresh-scheduler';
 import { supabase } from '../lib/supabase';
 import { getActiveOperator } from './operator-session';
 import type { CashMovement, CashSession, OrderItem, OrderStatus, RestaurantOrder, RestaurantProduct, ServiceType } from '../types/restaurant';
@@ -6,20 +7,29 @@ type BusinessContext = { empresaId: string; sucursalId: string };
 let cachedContext: BusinessContext | null = null;
 let cachedCash: CashSession | null | undefined;
 let contextUserId: string | undefined;
+let contextRequest: Promise<BusinessContext> | null = null;
+let contextGeneration = 0;
 supabase.auth.onAuthStateChange((_event, session) => {
   if (session?.user.id !== contextUserId) {
-    cachedContext = null; cachedCash = undefined; contextUserId = session?.user.id;
+    cachedContext = null; cachedCash = undefined; contextRequest = null; contextGeneration++; contextUserId = session?.user.id;
   }
 });
 
 async function context(): Promise<BusinessContext> {
   if (cachedContext) return cachedContext;
-  const { data, error } = await supabase.rpc('rest_crear_empresa_inicial', { nombre_empresa: 'Chicken Huerta' });
-  if (error) throw error;
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.empresa_id || !row?.sucursal_id) throw new Error('No se pudo cargar la empresa y sucursal.');
-  cachedContext = { empresaId: row.empresa_id, sucursalId: row.sucursal_id };
-  return cachedContext;
+  if (contextRequest) return contextRequest;
+  const generation = contextGeneration;
+  const request = (async () => {
+    const { data, error } = await supabase.rpc('rest_crear_empresa_inicial', { nombre_empresa: 'Chicken Huerta' });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.empresa_id || !row?.sucursal_id) throw new Error('No se pudo cargar la empresa y sucursal.');
+    if (generation !== contextGeneration) throw new Error('La sesión cambió. Vuelve a cargar la página.');
+    cachedContext = { empresaId: row.empresa_id, sucursalId: row.sucursal_id };
+    return cachedContext;
+  })();
+  contextRequest = request;
+  try { return await request; } finally { if (contextRequest === request) contextRequest = null; }
 }
 
 export async function getBusinessContext() {
@@ -102,11 +112,38 @@ function mapOrder(row: OrderRow): RestaurantOrder {
   };
 }
 
-export async function getOrders(): Promise<RestaurantOrder[]> {
+export type RestaurantChange = { orderIds: string[]; reload: boolean };
+export const activeOrderStates: OrderStatus[] = ['nuevo', 'preparando', 'listo', 'entregado'];
+export const kitchenOrderStates: OrderStatus[] = ['nuevo', 'preparando', 'listo'];
+const orderColumns = 'id,caja_id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,adicion_activa_id,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas,adicion_id)';
+export async function getOrders(options: { ids?: string[]; states?: OrderStatus[]; page?: number; status?: string } = {}): Promise<RestaurantOrder[]> {
   const { empresaId, sucursalId } = await context();
-  const { data, error } = await supabase.from('rest_pedidos').select('id,caja_id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,adicion_activa_id,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas,adicion_id)').eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).order('created_at', { ascending: false }).limit(250);
+  if (options.ids && !options.ids.length) return [];
+  const query = () => {
+    let q = supabase.from('rest_pedidos').select(orderColumns).eq('empresa_id', empresaId).eq('sucursal_id', sucursalId);
+    if (options.ids) q = q.in('id', options.ids);
+    if (options.states) q = q.in('estado', options.states);
+    if (options.status && options.status !== 'todos') q = q.eq('estado', options.status);
+    return q.order('created_at', { ascending: false }).order('id', { ascending: false });
+  };
+  if (options.states && !options.ids) {
+    // Cocina y mesas no pierden pedidos activos por el límite del historial.
+    const rows: OrderRow[] = [];
+    for (let start = 0; ; start += 100) {
+      const { data, error } = await query().range(start, start + 99);
+      if (error) throw error;
+      rows.push(...(data ?? []) as OrderRow[]);
+      if (!data || data.length < 100) return rows.map(mapOrder);
+    }
+  }
+  const page = Math.max(0, Math.floor(options.page ?? 0));
+  const { data, error } = await (options.ids ? query() : query().range(page * 100, page * 100 + (options.page === undefined ? 249 : 99)));
   if (error) throw error;
   return ((data ?? []) as OrderRow[]).map(mapOrder);
+}
+export function mergeOrderChanges(current: RestaurantOrder[], changed: RestaurantOrder[], ids: string[]) {
+  const removed = new Set(ids);
+  return [...current.filter(row => !removed.has(row.id)), ...changed].sort((a,b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
 }
 
 export async function getPaidOrdersByDate(start: string, end: string): Promise<RestaurantOrder[]> {
@@ -271,7 +308,7 @@ export async function subscribeProducts(listener: () => void, onStatus?: (status
     refreshTimer = window.setTimeout(listener, 120);
   };
   const channel = supabase.channel(`rest-productos-${empresaId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_productos' }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_productos', filter: `empresa_id=eq.${empresaId}` }, refresh)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') onStatus?.('connected');
       else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onStatus?.('error');
@@ -283,24 +320,32 @@ export async function subscribeProducts(listener: () => void, onStatus?: (status
   };
 }
 
-export async function subscribeRestaurantData(listener: () => void, onStatus?: (status: RealtimeStatus) => void) {
+export async function subscribeRestaurantData(listener: (change?: RestaurantChange) => void | Promise<void>, onStatus?: (status: RealtimeStatus) => void) {
   const { empresaId, sucursalId } = await context();
-  let refreshTimer: number | undefined;
-  const refresh = () => {
-    window.clearTimeout(refreshTimer);
-    refreshTimer = window.setTimeout(listener, 120);
-  };
+  const ids = new Set<string>();
+  let reload = false;
+  const schedule = createRefreshScheduler(async () => {
+    const change = { orderIds: [...ids], reload };
+    ids.clear(); reload = false;
+    await listener(change);
+  });
+  const refreshAll = () => { reload = true; schedule.request(); };
   const channel = supabase.channel(`rest-operacion-${empresaId}-${sucursalId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `empresa_id=eq.${empresaId}` }, refresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedido_items' }, refresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `empresa_id=eq.${empresaId}` }, () => { cachedCash = undefined; refresh(); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_movimientos_caja', filter: `empresa_id=eq.${empresaId}` }, refresh)
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') onStatus?.('connected');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_pedidos', filter: `sucursal_id=eq.${sucursalId}` }, payload => {
+      const row = payload.eventType === 'DELETE' ? payload.old : payload.new;
+      if (typeof row.id === 'string') ids.add(row.id); else reload = true;
+      if (ids.size > 50) { ids.clear(); reload = true; }
+      schedule.request();
+    })
+    // Los cambios de ítems notifican mediante el pedido padre; no hay suscripción global a ítems.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_cajas', filter: `sucursal_id=eq.${sucursalId}` }, () => { cachedCash = undefined; refreshAll(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_movimientos_caja', filter: `empresa_id=eq.${empresaId}` }, refreshAll)
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') { onStatus?.('connected'); refreshAll(); }
       else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onStatus?.('error');
       else if (status === 'CLOSED') onStatus?.('disconnected');
     });
-  return () => { void supabase.removeChannel(channel); };
+  return () => { schedule.dispose(); void supabase.removeChannel(channel); };
 }
 
 export function orderTotal(order: RestaurantOrder) {

@@ -1,3 +1,4 @@
+import LoadMoreRecords from '../components/LoadMoreRecords';
 import { useEffect, useState } from "react";
 import {
   createTask,
@@ -21,9 +22,9 @@ export default function Calendario() {
     prioridad: "media" as Task["prioridad"],
     responsable: "",
   });
-  const load = async () => setRows(await getTasks());
+  const load = async () => setRows(await getTasks(0));
   useEffect(() => {
-    void Promise.all([getTasks(), getEmployees()])
+    void Promise.all([getTasks(0), getEmployees()])
       .then(([tasks, staff]) => {
         setRows(tasks);
         setEmployees(staff.filter((employee) => employee.estado === "activo"));
@@ -161,6 +162,6 @@ export default function Calendario() {
           ))
         )}
       </section>
-    </div>
+    <LoadMoreRecords rows={rows} load={getTasks} onLoaded={setRows}/></div>
   );
 }

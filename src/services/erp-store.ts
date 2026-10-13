@@ -19,9 +19,16 @@ export type CompanySettings = { empresaId: string; branchId: string; nombre: str
 
 async function companyId() { return (await getBusinessContext()).empresaId; }
 
-async function list<T>(table: string, order = 'created_at'): Promise<T[]> {
+async function list<T>(table: string, order = 'created_at', page?: number, search?: string): Promise<T[]> {
   const empresaId = await companyId();
-  const { data, error } = await supabase.from(table).select('*').eq('empresa_id', empresaId).order(order, { ascending: false });
+  let query = supabase.from(table).select('*').eq('empresa_id', empresaId).order(order, { ascending: false }).order('id', { ascending: false });
+  if (page !== undefined && ['erp_clientes', 'erp_proveedores'].includes(table)) query = query.eq('activo', true);
+  if (search?.trim() && table === 'erp_clientes') {
+    const value = search.trim().replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+    query = query.or(`nombre.ilike."%${value}%",numero_documento.ilike."%${value}%",telefono.ilike."%${value}%"`);
+  }
+  if (page !== undefined) query = query.range(page * 100, page * 100 + 99);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as T[];
 }
@@ -33,20 +40,20 @@ async function insert<T>(table: string, values: Record<string, unknown>): Promis
   return data as T;
 }
 
-export const getClients = () => list<Client>('erp_clientes');
+export const getClients = (page?: number, search?: string) => list<Client>('erp_clientes', 'created_at', page, search);
 export const createClient = (values: Omit<Client, 'id' | 'activo' | 'created_at'>) => insert<Client>('erp_clientes', values);
-export const getSuppliers = () => list<Supplier>('erp_proveedores');
+export const getSuppliers = (page?: number) => list<Supplier>('erp_proveedores', 'created_at', page);
 export const createSupplier = (values: Omit<Supplier, 'id' | 'activo' | 'created_at'>) => insert<Supplier>('erp_proveedores', values);
-export const getEmployees = () => list<Employee>('erp_empleados');
+export const getEmployees = (page?: number) => list<Employee>('erp_empleados', 'created_at', page);
 export const createEmployee = (values: Omit<Employee, 'id' | 'estado' | 'created_at'>) => insert<Employee>('erp_empleados', values);
-export const getDocuments = () => list<ErpDocument>('erp_documentos');
+export const getDocuments = (page?: number) => list<ErpDocument>('erp_documentos', 'created_at', page);
 export const createDocument = (values: Omit<ErpDocument, 'id' | 'created_at'>) => insert<ErpDocument>('erp_documentos', values);
-export const getTasks = () => list<Task>('erp_tareas', 'fecha');
+export const getTasks = (page?: number) => list<Task>('erp_tareas', 'fecha', page);
 export const createTask = (values: Omit<Task, 'id' | 'estado' | 'created_at'>) => insert<Task>('erp_tareas', values);
 
-export async function getQuotes(): Promise<Quote[]> {
+export async function getQuotes(page = 0): Promise<Quote[]> {
   const empresaId = await companyId();
-  const { data, error } = await supabase.from('erp_cotizaciones').select('id,numero,cliente_id,cliente_nombre,estado,total,vence_at,observaciones,created_at,erp_cotizacion_items(producto_id,descripcion,cantidad,precio)').eq('empresa_id', empresaId).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('erp_cotizaciones').select('id,numero,cliente_id,cliente_nombre,estado,total,vence_at,observaciones,created_at,erp_cotizacion_items(producto_id,descripcion,cantidad,precio)').eq('empresa_id', empresaId).order('created_at', { ascending: false }).order('id', { ascending: false }).range(page * 100, page * 100 + 99);
   if (error) throw error;
   return (data ?? []).map(row => ({ ...row, numero: Number(row.numero), total: Number(row.total), erp_cotizacion_items: (row.erp_cotizacion_items ?? []).map(item => ({ ...item, cantidad: Number(item.cantidad), precio: Number(item.precio) })) })) as Quote[];
 }
