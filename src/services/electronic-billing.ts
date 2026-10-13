@@ -51,7 +51,7 @@ const SUNAT_PRODUCTION = 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billSer
 
 export async function getBillingConfiguration(): Promise<BillingConfig> {
   const { empresaId } = await getBusinessContext();
-  const { data, error } = await supabase.from('ef_configuraciones').select('*').eq('empresa_id', empresaId).maybeSingle();
+  const { data, error } = await supabase.from('ef_configuraciones').select('id,proveedor,ambiente,ruta_pruebas,ruta_produccion,usuario_sol,certificado_nombre,certificado_vence_at,token_configurado,clave_sol_configurada,certificado_configurado,activo').eq('empresa_id', empresaId).maybeSingle();
   if (error) throw error;
   return {
     id: data?.id,
