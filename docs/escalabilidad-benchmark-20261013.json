@@ -1,0 +1,100 @@
+{
+  "generated_at": "2026-10-13T20:38:32.059Z",
+  "environment": "Local PGlite WASM, one database engine with serialized query execution",
+  "fixture": {
+    "companies": 100,
+    "orders": 100000,
+    "items": 200000
+  },
+  "workload": "10 reads per simulated client; indexed tenant filter; compares 250-row, 100-row and single-order refreshes",
+  "scenarios": [
+    {
+      "simulated_clients": 10,
+      "rows_per_query": 100,
+      "mode": "history",
+      "queries": 100,
+      "errors": 0,
+      "elapsed_ms": 226,
+      "queries_per_second": 443,
+      "p50_ms": 22,
+      "p95_ms": 25,
+      "max_ms": 25
+    },
+    {
+      "simulated_clients": 50,
+      "rows_per_query": 100,
+      "mode": "history",
+      "queries": 500,
+      "errors": 0,
+      "elapsed_ms": 1143,
+      "queries_per_second": 437,
+      "p50_ms": 107,
+      "p95_ms": 142,
+      "max_ms": 151
+    },
+    {
+      "simulated_clients": 100,
+      "rows_per_query": 100,
+      "mode": "history",
+      "queries": 1000,
+      "errors": 0,
+      "elapsed_ms": 2088,
+      "queries_per_second": 479,
+      "p50_ms": 205,
+      "p95_ms": 225,
+      "max_ms": 240
+    },
+    {
+      "simulated_clients": 100,
+      "rows_per_query": 250,
+      "mode": "history",
+      "queries": 1000,
+      "errors": 0,
+      "elapsed_ms": 4554,
+      "queries_per_second": 220,
+      "p50_ms": 449,
+      "p95_ms": 499,
+      "max_ms": 509
+    },
+    {
+      "simulated_clients": 100,
+      "rows_per_query": 1,
+      "mode": "incremental",
+      "queries": 1000,
+      "errors": 0,
+      "elapsed_ms": 513,
+      "queries_per_second": 1950,
+      "p50_ms": 49,
+      "p95_ms": 64,
+      "max_ms": 65
+    }
+  ],
+  "limitations": [
+    "Simulated asynchronous clients share one local SQL engine; not independent PostgreSQL sessions.",
+    "No production traffic, network, Supabase Auth/RLS workload, Realtime fanout, certificate signing or SUNAT measured.",
+    "These results do not certify production capacity for 100 simultaneous companies."
+  ],
+  "query_plan": [
+    {
+      "QUERY PLAN": "Limit  (cost=0.42..1258.58 rows=100 width=52)"
+    },
+    {
+      "QUERY PLAN": "  ->  Index Only Scan using orders_tenant_date_idx on orders p  (cost=0.42..12833.70 rows=1020 width=52)"
+    },
+    {
+      "QUERY PLAN": "        Index Cond: ((empresa_id = 42) AND (sucursal_id = 1))"
+    },
+    {
+      "QUERY PLAN": "        SubPlan 1"
+    },
+    {
+      "QUERY PLAN": "          ->  Aggregate  (cost=11.48..11.49 rows=1 width=32)"
+    },
+    {
+      "QUERY PLAN": "                ->  Index Scan using items_order_idx on items i  (cost=0.42..11.46 rows=2 width=24)"
+    },
+    {
+      "QUERY PLAN": "                      Index Cond: (pedido_id = p.id)"
+    }
+  ]
+}
