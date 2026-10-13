@@ -1,136 +1,40 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  getAccountingEntries,
-  type AccountingEntry,
-} from "../services/erp-store";
-import {
-  getInventoryPurchases,
-  getSupplies,
-  type InventoryPurchase,
-  type Supply,
-} from "../services/inventory-store";
-import { getOrders, getPaidOrdersByDate, orderTotal } from "../services/restaurant-store";
+import { useEffect, useState } from "react";
+import { getSupplies, type Supply } from '../services/inventory-store';
+import { getOrders, orderTotal } from '../services/restaurant-store';
+import { getPeriodSummary, getSalePage, getSalesCsv, limaToday, shiftDate, emptyPeriod, type PeriodSummary, type SaleSummary } from '../services/reporting';
+import LoadMoreRecords from '../components/LoadMoreRecords';
 import type { RestaurantOrder } from "../types/restaurant";
 const money = new Intl.NumberFormat("es-PE", {
   style: "currency",
   currency: "PEN",
 });
 export default function Reportes() {
-  const [orders, setOrders] = useState<RestaurantOrder[]>([]),
-    [purchases, setPurchases] = useState<InventoryPurchase[]>([]),
-    [entries, setEntries] = useState<AccountingEntry[]>([]),
-    [supplies, setSupplies] = useState<Supply[]>([]),
-    [period, setPeriod] = useState("30"),
-    [selectedDate, setSelectedDate] = useState(() => new Date().toLocaleDateString("en-CA")),
-    [dailyOrders, setDailyOrders] = useState<RestaurantOrder[] | null>(null),
-    [selectedSale, setSelectedSale] = useState<RestaurantOrder | null>(null),
-    [loadingDay, setLoadingDay] = useState(false),
-    [error, setError] = useState("");
+  const [summaryData, setSummary] = useState<PeriodSummary>(emptyPeriod);
+  const [paidData, setPaid] = useState<SaleSummary[]>([]), [supplies,setSupplies] = useState<Supply[]>([]);
+  const [period,setPeriod] = useState('30'), [selectedDate,setSelectedDate] = useState(limaToday);
+  const [selectedSale,setSelectedSale] = useState<RestaurantOrder | null>(null);
+  const [loadedRange,setLoadedRange] = useState(''), [exporting,setExporting] = useState(false), [error,setError] = useState('');
+  const to = period === 'date' ? selectedDate : limaToday();
+  const from = period === 'date' ? selectedDate : shiftDate(to, 1-Number(period));
+  const range = `${from}:${to}`, loadingDay = loadedRange !== range;
+  const summary = loadedRange === range ? summaryData : emptyPeriod, paid = loadedRange === range ? paidData : [];
+  useEffect(() => { let active = true; void getSupplies().then(rows => { if(active)setSupplies(rows); }).catch(e => { if(active)setError(e.message); }); return () => { active=false; }; }, []);
   useEffect(() => {
-    void Promise.all([
-      getOrders(),
-      getInventoryPurchases(),
-      getAccountingEntries(),
-      getSupplies(),
-    ])
-      .then(([o, p, e, s]) => {
-        setOrders(o);
-        setPurchases(p);
-        setEntries(e);
-        setSupplies(s);
-      })
-      .catch((e) =>
-        setError(
-          e instanceof Error
-            ? e.message
-            : "No se pudieron generar los reportes.",
-        ),
-      );
-  }, []);
-  useEffect(() => {
-    if (period !== "date") {
-      setDailyOrders(null);
-      return;
-    }
-    const start = new Date(`${selectedDate}T00:00:00`);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    setLoadingDay(true);
-    setError("");
-    void getPaidOrdersByDate(start.toISOString(), end.toISOString())
-      .then(setDailyOrders)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : "No se pudieron cargar las ventas del día."))
-      .finally(() => setLoadingDay(false));
-  }, [period, selectedDate]);
-  const start = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - Number(period) + 1);
-    return d;
-  }, [period]);
-  const paid = period === "date" ? (dailyOrders ?? []) : orders.filter(
-      (o) => o.status === "pagado" && new Date(o.updatedAt) >= start,
-    ),
-    buys = purchases.filter((p) => p.status === 'registrada' && new Date(p.createdAt) >= start),
-    manual = entries.filter(
-      (e) => new Date(`${e.fecha}T00:00:00`) >= start,
-    );
-  const sales = paid.reduce((s, o) => s + orderTotal(o), 0),
-    expenses =
-      buys.reduce((s, p) => s + p.totalCost, 0) +
-      manual
-        .filter((e) => e.tipo === "egreso")
-        .reduce((s, e) => s + e.monto, 0),
-    otherIncome = manual
-      .filter((e) => e.tipo === "ingreso")
-      .reduce((s, e) => s + e.monto, 0);
-  const methods = paid.reduce<Record<string, number>>((a, o) => {
-    const k = o.paymentMethod || "Sin método";
-    a[k] = (a[k] || 0) + orderTotal(o);
-    return a;
-  }, {});
-  const products = Object.values(
-    paid
-      .flatMap((o) => o.items)
-      .reduce<
-        Record<string, { name: string; quantity: number; amount: number }>
-      >((a, i) => {
-        const k = i.productId || i.name;
-        if (!a[k]) a[k] = { name: i.name, quantity: 0, amount: 0 };
-        a[k].quantity += i.quantity;
-        a[k].amount += i.quantity * i.unitPrice;
-        return a;
-      }, {}),
-  )
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 8);
-  const exportCsv = () => {
-    const lines = [
-      ["Fecha", "Pedido", "Servicio", "Método", "Total"],
-      ...paid.map((o) => [
-        new Date(o.updatedAt).toLocaleDateString("es-PE"),
-        String(o.number),
-        o.serviceType,
-        o.paymentMethod || "",
-        orderTotal(o).toFixed(2),
-      ]),
-    ];
-    const blob = new Blob(
-      [
-        lines
-          .map((r) =>
-            r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","),
-          )
-          .join("\n"),
-      ],
-      { type: "text/csv;charset=utf-8" },
-    );
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `reporte-ventas-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    let active=true;
+    void Promise.all([getPeriodSummary(from,to),getSalePage(from,to)]).then(([totals,rows])=>{if(active){setSummary(totals);setPaid(rows);setLoadedRange(`${from}:${to}`);setSelectedSale(null);setError('');}}).catch(e=>{if(active){setError(e.message);setSummary(emptyPeriod);setPaid([]);setLoadedRange(`${from}:${to}`);}});
+    return () => { active=false; };
+  },[from,to]);
+  const {sales,expenses,otherIncome,methods,products} = summary;
+  const openSale = async (id:string) => { try { const rows=await getOrders({ids:[id]});if(!rows[0])throw new Error('El pedido ya no está disponible.');setSelectedSale(rows[0]); } catch(e){setError(e instanceof Error?e.message:'No se pudo abrir el detalle.');} };
+  const exportCsv = async () => {
+    setExporting(true);setError('');
+    try {
+      const csv=await getSalesCsv(from,to);
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`reporte-ventas-${from}-${to}.csv`;a.click();URL.revokeObjectURL(a.href);
+    }catch(e){setError(e instanceof Error?e.message:'No se pudo exportar el periodo completo.');}finally{setExporting(false);}
   };
+
   return (
     <div id="daily-report" className="space-y-6 p-6">
       <style>{`@media print { body * { visibility: hidden !important; } #daily-report, #daily-report * { visibility: visible !important; } #daily-report { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; padding: 0 !important; color: #000 !important; background: #fff !important; } #daily-report section, #daily-report section > div, #daily-report .report-block { break-inside: avoid !important; page-break-inside: avoid !important; box-shadow: none !important; } .report-actions { display: none !important; } } @page { size: A4 portrait; margin: 10mm; }`}</style>
@@ -140,7 +44,7 @@ export default function Reportes() {
             Reportes reales
           </h1>
           <p className="font-medium text-slate-600">
-            Ventas, métodos de pago, compras, resultado e inventario.
+            Ventas de esta sucursal; compras y movimientos manuales de toda la empresa.
           </p>
         </div>
         <div className="report-actions flex gap-2">
@@ -158,16 +62,16 @@ export default function Reportes() {
           {period === "date" && <input
             type="date"
             value={selectedDate}
-            max={new Date().toLocaleDateString("en-CA")}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            max={limaToday()}
+            onChange={(e) => setSelectedDate(e.target.value || limaToday())}
             className="rounded-xl border bg-white px-4 py-3 font-bold"
             aria-label="Fecha de las ventas"
           />}
           <button
-            onClick={exportCsv}
+            disabled={exporting || loadingDay} onClick={() => void exportCsv()}
             className="rounded-xl bg-blue-600 px-5 py-3 font-black text-white"
           >
-            Descargar CSV
+            {exporting ? "Exportando…" : "Descargar CSV"}
           </button>
           <button
             onClick={() => window.print()}
@@ -221,7 +125,7 @@ export default function Reportes() {
             <div className="space-y-3">
               {products.map((p, i) => (
                 <div
-                  key={p.name}
+                  key={p.key}
                   className="grid grid-cols-[32px_1fr_auto] items-center gap-3 rounded-xl bg-slate-50 p-3"
                 >
                   <b className="text-blue-600">#{i + 1}</b>
@@ -245,12 +149,14 @@ export default function Reportes() {
             <Empty />
           ) : (
             paid.map((o) => (
-              <button type="button" onClick={() => setSelectedSale(o)} key={o.id} className="flex w-full items-center justify-between border-b py-3 text-left transition hover:bg-blue-50">
-                <span><b>Pedido #{String(o.number).padStart(3, "0")}</b><small className="block text-slate-500">{new Date(o.updatedAt).toLocaleString("es-PE")} · {o.paymentMethod || "Sin método"}</small></span>
-                <span className="flex items-center gap-3"><strong>{money.format(orderTotal(o))}</strong><span className="text-sm font-bold text-blue-600">Ver</span></span>
+              <button type="button" onClick={() => void openSale(o.id)} key={o.id} className="flex w-full items-center justify-between border-b py-3 text-left transition hover:bg-blue-50">
+                <span><b>Pedido #{String(o.numero).padStart(3, "0")}</b><small className="block text-slate-500">{new Date(o.updated_at).toLocaleString("es-PE",{timeZone:"America/Lima"})} · {o.metodo_pago || "Sin método"}</small></span>
+                <span className="flex items-center gap-3"><strong>{money.format(o.total)}</strong><span className="text-sm font-bold text-blue-600">Ver</span></span>
               </button>
             ))
           )}
+          <LoadMoreRecords key={`${from}:${to}`} rows={paid} load={page => getSalePage(from,to,page)} onLoaded={setPaid}/>
+          <p className="text-xs text-slate-500">Detalle: {paid.length} de {summary.count} ventas. Los totales y el CSV incluyen el periodo completo.</p>
         </div>
         <div className="rounded-2xl border bg-white p-5">
           <h2 className="mb-4 text-lg font-black">Alertas de stock</h2>

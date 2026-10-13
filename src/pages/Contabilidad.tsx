@@ -1,25 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  createAccountingEntry,
-  getAccountingEntries,
-  type AccountingEntry,
-} from "../services/erp-store";
-import {
-  getInventoryPurchases,
-  type InventoryPurchase,
-} from "../services/inventory-store";
-import { getOrders, orderTotal } from "../services/restaurant-store";
-import type { RestaurantOrder } from "../types/restaurant";
-type Row = {
-  id: string;
-  date: string;
-  type: "ingreso" | "egreso";
-  category: string;
-  description: string;
-  amount: number;
-  method: string;
-  source: string;
-};
+import { useEffect, useState } from "react";
+import { createAccountingEntry } from '../services/erp-store';
+import { getPeriodSummary, getLedgerPage, limaToday, emptyPeriod, type PeriodSummary, type LedgerRow } from '../services/reporting';
+import LoadMoreRecords from '../components/LoadMoreRecords';
 const money = new Intl.NumberFormat("es-PE", {
     style: "currency",
     currency: "PEN",
@@ -29,15 +11,16 @@ const money = new Intl.NumberFormat("es-PE", {
 const displayDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value.split("-").reverse().join("/")
-    : new Date(value).toLocaleDateString("es-PE");
+    : new Date(value).toLocaleDateString("es-PE",{timeZone:"America/Lima"});
 export default function Contabilidad() {
-  const [orders, setOrders] = useState<RestaurantOrder[]>([]),
-    [purchases, setPurchases] = useState<InventoryPurchase[]>([]),
-    [entries, setEntries] = useState<AccountingEntry[]>([]),
-    [error, setError] = useState(""),
-    [saving, setSaving] = useState(false);
+  const [rowData,setRows] = useState<LedgerRow[]>([]), [summaryData,setSummary] = useState<PeriodSummary>(emptyPeriod);
+  const [from,setFrom] = useState(() => `${limaToday().slice(0,7)}-01`), [to,setTo] = useState(limaToday);
+  const [loadedRange,setLoadedRange] = useState('');
+  const range = `${from}:${to}`;
+  const rows = loadedRange === range ? rowData : [], summary = loadedRange === range ? summaryData : emptyPeriod;
+  const [error,setError] = useState(''), [saving,setSaving] = useState(false);
   const [f, setF] = useState({
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: limaToday(),
     tipo: "egreso" as "ingreso" | "egreso",
     categoria: "Servicios",
     descripcion: "",
@@ -46,76 +29,14 @@ export default function Contabilidad() {
     referencia: "",
   });
   const load = async () => {
-    const [o, p, e] = await Promise.all([
-      getOrders(),
-      getInventoryPurchases(),
-      getAccountingEntries(),
-    ]);
-    setOrders(o);
-    setPurchases(p);
-    setEntries(e);
+    const [totals,data] = await Promise.all([getPeriodSummary(from,to),getLedgerPage(from,to)]);setSummary(totals);setRows(data);setLoadedRange(`${from}:${to}`);setError('');
   };
   useEffect(() => {
-    void Promise.all([
-      getOrders(),
-      getInventoryPurchases(),
-      getAccountingEntries(),
-    ])
-      .then(([o, p, e]) => {
-        setOrders(o);
-        setPurchases(p);
-        setEntries(e);
-      })
-      .catch((e) =>
-        setError(
-          e instanceof Error ? e.message : "No se pudo cargar contabilidad.",
-        ),
-      );
-  }, []);
-  const rows = useMemo<Row[]>(
-    () =>
-      [
-        ...orders
-          .filter((o) => o.status === "pagado")
-          .map((o) => ({
-            id: `v-${o.id}`,
-            date: o.updatedAt,
-            type: "ingreso" as const,
-            category: "Ventas",
-            description: `Pedido #${String(o.number).padStart(3, "0")}`,
-            amount: orderTotal(o),
-            method: o.paymentMethod || "No indicado",
-            source: "POS",
-          })),
-        ...purchases.map((p) => ({
-          id: `c-${p.id}`,
-          date: p.createdAt,
-          type: "egreso" as const,
-          category: "Compras",
-          description: `${p.supplyName} · ${p.provider}`,
-          amount: p.totalCost,
-          method: "No indicado",
-          source: "Inventario",
-        })),
-        ...entries.map((e) => ({
-          id: `m-${e.id}`,
-          date: e.fecha,
-          type: e.tipo,
-          category: e.categoria,
-          description: e.descripcion,
-          amount: e.monto,
-          method: e.metodo_pago || "No indicado",
-          source: "Manual",
-        })),
-      ].sort((a, b) => b.date.localeCompare(a.date)),
-    [orders, purchases, entries],
-  );
-  const income = rows
-      .filter((r) => r.type === "ingreso")
-      .reduce((s, r) => s + r.amount, 0),
-    expense = rows
-      .filter((r) => r.type === "egreso")
-      .reduce((s, r) => s + r.amount, 0);
+    let active=true;
+    void Promise.all([getPeriodSummary(from,to),getLedgerPage(from,to)]).then(([totals,data])=>{if(active){setSummary(totals);setRows(data);setLoadedRange(`${from}:${to}`);setError('');}}).catch(e=>{if(active){setError(e.message);setSummary(emptyPeriod);setRows([]);setLoadedRange(`${from}:${to}`);}});
+    return () => { active=false; };
+  },[from,to]);
+  const income = summary.sales+summary.otherIncome, expense=summary.expenses;
   const save = async () => {
     if (!f.descripcion.trim() || Number(f.monto) <= 0)
       return setError("Completa la descripción y un monto mayor a cero.");
@@ -150,6 +71,7 @@ export default function Contabilidad() {
           {error}
         </div>
       )}
+      <div className="flex flex-wrap items-end gap-3"><label className="text-sm font-bold">Desde<input aria-label="Desde" type="date" className={cls} value={from} onChange={e=>setFrom(e.target.value || to)}/></label><label className="text-sm font-bold">Hasta<input aria-label="Hasta" type="date" className={cls} value={to} onChange={e=>setTo(e.target.value || from)}/></label><p className="text-sm text-slate-500">Totales del periodo completo. Compras y movimientos manuales corresponden a toda la empresa; ventas a esta sucursal.</p></div>
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border bg-white p-5">
           <p className="font-bold text-slate-500">Ingresos</p>
@@ -282,6 +204,7 @@ export default function Contabilidad() {
             )}
           </tbody>
         </table>
+        <LoadMoreRecords key={`${from}:${to}`} rows={rows} load={page=>getLedgerPage(from,to,page)} onLoaded={setRows}/>
       </section>
     </div>
   );
