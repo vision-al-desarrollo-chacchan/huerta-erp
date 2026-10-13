@@ -1,0 +1,11 @@
+{
+  "environment": "beta",
+  "issuerRuc": "20123456789",
+  "fictitiousOnly": true,
+  "summaryId": "RC-20261012-42793",
+  "ticket": "1791863156402",
+  "status": "aceptado",
+  "code": "0",
+  "message": "El Resumen diario RC-20261012-42793, ha sido aceptado",
+  "transport": "Direct SOAP via curl with TLS; not the deployed authenticated ERP endpoint"
+}

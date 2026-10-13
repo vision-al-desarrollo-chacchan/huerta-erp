@@ -1,14 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { createCertificateHandler } from '../_shared/sunat-signing/certificate-handler.mjs';
+import { sealSunatCertificate } from '../_shared/sunat-signing/certificate-vault.mjs';
+import { backendSunatKey } from '../_shared/sunat-signing/backend-key.ts';
 const url=Deno.env.get('SUPABASE_URL')??'';
 const anon=Deno.env.get('SUPABASE_ANON_KEY')??'';
 const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'';
 const keyBase64=Deno.env.get('SUNAT_CERTIFICATE_KEY_BASE64')??'';
 const keyId=Deno.env.get('SUNAT_CERTIFICATE_KEY_ID')??'v1';
-const enabled=Deno.env.get('SUNAT_CERTIFICATE_UPLOAD_ENABLED')==='true'&&!!url&&!!anon&&!!serviceKey&&!!keyBase64;
+const enabled=Deno.env.get('SUNAT_CERTIFICATE_UPLOAD_ENABLED')!=='false'&&!!url&&!!anon&&!!serviceKey;
 const admin=enabled?createClient(url,serviceKey,{auth:{persistSession:false}}):null;
 Deno.serve(createCertificateHandler({
  enabled,keyBase64,keyId,
+ async seal(input: {pfxBase64:string;password:string;empresaId:string;issuerRuc:string;keyId?:string;keyBase64:string}){return sealSunatCertificate({...input,keyBase64:keyBase64||await backendSunatKey(admin!)});},
  async authenticate(authorization:string){
   if(!authorization.startsWith('Bearer '))return null;
   const client=createClient(url,anon,{global:{headers:{Authorization:authorization}},auth:{persistSession:false}});
