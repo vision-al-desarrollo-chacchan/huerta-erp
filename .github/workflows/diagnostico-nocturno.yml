@@ -1,0 +1,42 @@
+name: Diagnostico nocturno seguro
+on:
+  schedule:
+    - cron: '17 8 * * *' # 03:17 America/Lima (UTC-5)
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Verificar lint
+        run: npm run lint
+        continue-on-error: true
+      - name: Verificar compilación
+        run: npm run build
+        continue-on-error: true
+      - name: Pruebas disponibles
+        run: node --test scripts/*.test.mjs
+        continue-on-error: true
+      - name: Guardar resumen
+        if: always()
+        run: |
+          mkdir -p informe
+          echo "# Diagnostico nocturno" > informe/resumen.md
+          echo "Repositorio: ${{ github.repository }}" >> informe/resumen.md
+          echo "Fecha UTC: $(date -u)" >> informe/resumen.md
+          echo "Estado: ${{ job.status }}" >> informe/resumen.md
+          echo "Consulta los logs de cada paso para detalles." >> informe/resumen.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: informe-nocturno
+          path: informe/
