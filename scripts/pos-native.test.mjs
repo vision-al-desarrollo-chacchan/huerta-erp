@@ -6,9 +6,9 @@ const connection = process.env.HUERTA_TEST_DATABASE_URL;
 if (!connection) throw new Error('Set HUERTA_TEST_DATABASE_URL to a disposable local PostgreSQL test database.');
 const url = new URL(connection);
 if (!['127.0.0.1','localhost','[::1]'].includes(url.hostname) || !/^\/huerta_test_[a-z0-9_]+$/.test(url.pathname)) throw new Error('Refusing a non-local or non-test database.');
-function sql(statement) {
+function sql(statement, target = connection) {
  return new Promise((resolve,reject)=>{
-  const child=spawn('psql',['--no-psqlrc','-v','ON_ERROR_STOP=1','-At',connection,'-f','-'],{stdio:['pipe','pipe','pipe']});
+  const child=spawn('psql',['--no-psqlrc','-v','ON_ERROR_STOP=1','-At',target,'-f','-'],{stdio:['pipe','pipe','pipe']});
   child.stdin.on('error',()=>{});child.stdin.end(statement);
   let output='',error='';child.stdout.on('data',v=>output+=v);child.stderr.on('data',v=>error+=v);
   child.on('error',reject);child.on('close',code=>code===0?resolve(output.trim()):reject(new Error(error.trim())));
@@ -78,3 +78,19 @@ const stock=JSON.parse(tail(await sql(`select json_build_object('stock',stock,'r
 assert.ok(stock.stock>=0&&stock.reserved>=0&&stock.reserved<=stock.stock);
 console.log('PASS native independent connections: reservation versus waste preserves available-stock invariants');
 console.log('Native tests complete. Only disposable fixture database used; no network calls to Supabase or SUNAT.');
+
+// Exercise backup/restore of this synthetic fixture; this is not a backup of the live restaurant.
+const dump=await new Promise((resolve,reject)=>{
+ const child=spawn('pg_dump',['--no-owner',connection],{stdio:['ignore','pipe','pipe']});
+ let output='',error='';child.stdout.on('data',v=>output+=v);child.stderr.on('data',v=>error+=v);
+ child.on('error',reject);child.on('close',code=>code===0?resolve(output):reject(new Error(error)));
+});
+await sql('create database huerta_test_restore');
+const restored=new URL(connection);restored.pathname='/huerta_test_restore';
+await sql(dump,restored.href);
+const restoredStock=JSON.parse(tail(await sql(`select json_build_object('stock',stock,'reserved',reservado) from rest_insumos where id='${i}'`,restored.href)));
+assert.deepEqual(restoredStock,stock);
+const restoredClose=JSON.parse(tail(await sql(`select json_build_object('expected',monto_esperado,'counted',monto_cierre,'cash',metodos_cierre->'Efectivo','state',estado) from rest_cajas where id='${cash}'`,restored.href)));
+assert.deepEqual(restoredClose,report);
+assert.equal(tail(await sql(`select has_table_privilege('authenticated','public.rest_pedidos','UPDATE')`,restored.href)),'f');
+console.log('PASS native pg_dump/restore: synthetic stock, reservations, closed cash snapshot and denied direct writes preserved');
