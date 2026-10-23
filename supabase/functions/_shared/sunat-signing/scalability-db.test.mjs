@@ -30,6 +30,7 @@ insert into ef_configuraciones values('11111111-1111-4111-8111-111111111111',tru
 insert into ef_sunat_habilitaciones values('11111111-1111-4111-8111-111111111111','20123456789','hash',true,now());
 insert into ef_sunat_certificados values('11111111-1111-4111-8111-111111111111','hash');`);
 await db.exec(readFileSync(new URL('../../../migrations/20261013200222_scalability_queue_and_indexes.sql',import.meta.url),'utf8'));
+await db.exec(readFileSync(new URL('../../../migrations/20261023050438_pos_queue_limits.sql',import.meta.url),'utf8'));
 for(const role of ['anon','authenticated']){
  await db.exec(`set role ${role}`);
  await assert.rejects(db.query('select * from ef_sunat_trabajos'));
@@ -56,6 +57,14 @@ await db.query('update ef_documentos set transmision_iniciada_at=now(),estado=\'
 await db.query("update ef_sunat_trabajos set lease_until=now()-interval '1 minute' where documento_id=$1",[first[1].documento_id]);
 await claim();assert.equal((await db.query('select estado from ef_sunat_trabajos where documento_id=$1',[first[1].documento_id])).rows[0].estado,'blocked');
 assert.equal((await enqueue(first[1].documento_id)).rows[0].ef_sunat_encolar,'incierto');
+await db.exec('reset role');
+await db.exec(`update ef_sunat_trabajos set estado='done',lease_until=null;
+ insert into rest_empresas values('99999999-9999-4999-8999-999999999999','20999999999',true);
+ insert into ef_documentos(id,empresa_id,estado)values('99999999-1111-4111-8111-111111111111','99999999-9999-4999-8999-999999999999','pendiente');
+ insert into ef_sunat_trabajos(documento_id,usuario_id)values('99999999-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+ update ef_sunat_trabajos set estado='queued',disponible_at=now()-interval '1 hour' where documento_id in('${ids[0]}','${ids[1]}');set role service_role;`);
+const fair=(await claim()).rows;assert.equal(fair.length,2);assert.ok(fair.some(x=>x.documento_id==='99999999-1111-4111-8111-111111111111'));
+console.log('PASS competing tenant gets a slot ahead of an older second job of one tenant');
 await db.exec('reset role');
 await db.query("insert into rest_pedidos values($1,'2000-01-01')",[ids[0]]);
 await db.query("insert into rest_pedido_items(pedido_id,nombre)values($1,'a'),($1,'b')",[ids[0]]);

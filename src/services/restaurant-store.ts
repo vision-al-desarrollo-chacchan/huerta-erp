@@ -116,11 +116,12 @@ export type RestaurantChange = { orderIds: string[]; reload: boolean };
 export const activeOrderStates: OrderStatus[] = ['nuevo', 'preparando', 'listo', 'entregado'];
 export const kitchenOrderStates: OrderStatus[] = ['nuevo', 'preparando', 'listo'];
 const orderColumns = 'id,caja_id,numero,tipo_servicio,mesa,cliente,estado,metodo_pago,adicion_activa_id,created_at,updated_at,rest_pedido_items(producto_id,nombre,cantidad,precio_unitario,notas,adicion_id)';
-export async function getOrders(options: { ids?: string[]; states?: OrderStatus[]; page?: number; status?: string } = {}): Promise<RestaurantOrder[]> {
+export async function getOrders(options: { ids?: string[]; states?: OrderStatus[]; page?: number; status?: string; cashId?: string } = {}): Promise<RestaurantOrder[]> {
   const { empresaId, sucursalId } = await context();
   if (options.ids && !options.ids.length) return [];
   const query = () => {
     let q = supabase.from('rest_pedidos').select(orderColumns).eq('empresa_id', empresaId).eq('sucursal_id', sucursalId);
+    if (options.cashId) q = q.eq('caja_id', options.cashId);
     if (options.ids) q = q.in('id', options.ids);
     if (options.states) q = q.in('estado', options.states);
     if (options.status && options.status !== 'todos') q = q.eq('estado', options.status);
@@ -198,14 +199,14 @@ export async function getCashSessionSales(since: string): Promise<CashSessionSal
   }));
 }
 
-export async function createOrder(order: { serviceType: ServiceType; table?: string; customer?: string; items: OrderItem[] }) {
+export async function createOrder(order: { serviceType: ServiceType; table?: string; customer?: string; items: OrderItem[] }, idempotencyKey: string) {
   const { empresaId, sucursalId } = await context();
   const cash = await getCashSession();
   if (!cash || cash.status !== 'abierta') throw new Error('Primero debes abrir la caja.');
   const { data, error } = await supabase.rpc('rest_crear_pedido', {
     p_empresa_id: empresaId, p_sucursal_id: sucursalId, p_caja_id: cash.id,
     p_tipo_servicio: order.serviceType, p_mesa: order.table ?? '', p_cliente: order.customer ?? '', p_items: order.items,
-    p_idempotency_key: crypto.randomUUID(),
+    p_idempotency_key: idempotencyKey,
   });
   if (error) throw error;
   const created = Array.isArray(data) ? data[0] : data;
@@ -280,7 +281,7 @@ export async function closeCash(closingAmount: number, nextShiftFund: number, no
   if (error) throw error;
   cachedCash = null;
   const row = Array.isArray(data) ? data[0] : data;
-  return { id: row.id, openingAmount: Number(row.monto_apertura), closingAmount: Number(row.monto_cierre), expectedAmount: Number(row.monto_esperado), difference: Number(row.diferencia), notes: row.observaciones ?? undefined, nextShiftFund: Number(row.fondo_siguiente), withdrawnAmount: Number(row.efectivo_retirado), status: row.estado, openedAt: row.abierta_at, closedAt: row.cerrada_at, openedByName: row.abierta_por_nombre ?? undefined, closedByName: row.cerrada_por_nombre ?? undefined } as CashSession;
+  return { id: row.id, openingAmount: Number(row.monto_apertura), closingAmount: Number(row.monto_cierre), expectedAmount: Number(row.monto_esperado), difference: Number(row.diferencia), notes: row.observaciones ?? undefined, nextShiftFund: Number(row.fondo_siguiente), withdrawnAmount: Number(row.efectivo_retirado), paymentSnapshot: row.metodos_cierre, movementSnapshot: (row.movimientos_cierre ?? []).map((m: Record<string, unknown>) => ({ id: String(m.id), type: m.tipo as 'ingreso' | 'egreso', concept: String(m.concepto), amount: Number(m.monto), paymentMethod: String(m.metodo_pago), registeredByName: String(m.registrado_por_nombre), createdAt: String(m.created_at) })), status: row.estado, openedAt: row.abierta_at, closedAt: row.cerrada_at, openedByName: row.abierta_por_nombre ?? undefined, closedByName: row.cerrada_por_nombre ?? undefined } as CashSession;
 }
 
 export async function getCashMovements(): Promise<CashMovement[]> {
@@ -349,5 +350,23 @@ export async function subscribeRestaurantData(listener: (change?: RestaurantChan
 }
 
 export function orderTotal(order: RestaurantOrder) {
-  return order.items.reduce((total, item) => total + item.quantity * item.unitPrice, 0);
+  return order.items.reduce((total, item) => total + Math.round(item.quantity * item.unitPrice * 100), 0) / 100;
+}
+
+export type CashSummary = { sales: number; payments: Record<string, number>; cashMovementNet: number };
+export async function getCashSummary(): Promise<CashSummary> {
+  const cash = await getCashSession();
+  if (!cash) return { sales: 0, payments: {}, cashMovementNet: 0 };
+  const { data, error } = await supabase.rpc('rest_resumen_caja', { p_caja_id: cash.id });
+  if (error) throw error;
+  return { sales: Number(data.sales), payments: data.payments ?? {}, cashMovementNet: Number(data.cashMovementNet) };
+}
+export async function getCashOrders(): Promise<RestaurantOrder[]> {
+  const cash = await getCashSession();
+  if (!cash) return [];
+  const [delivered, paid] = await Promise.all([
+    getOrders({ cashId: cash.id, states: ['entregado'] }),
+    getOrders({ cashId: cash.id, status: 'pagado', page: 0 }),
+  ]);
+  return [...delivered, ...paid];
 }

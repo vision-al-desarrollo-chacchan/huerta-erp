@@ -48,6 +48,8 @@ export interface CashSession {
   notes?: string;
   nextShiftFund?: number;
   withdrawnAmount?: number;
+  paymentSnapshot?: Record<string, number>;
+  movementSnapshot?: CashMovement[];
 }
 
 export interface CashMovement {
