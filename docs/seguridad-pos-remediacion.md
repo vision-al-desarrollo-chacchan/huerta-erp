@@ -58,4 +58,10 @@ Para S/39 mensual y S/290 anual, ingreso mensual equivalente = `39 × clientes_m
 
 ## Resultado de esta ejecución
 
-83 pruebas aprobadas, 0 fallidas; compilación TypeScript/Vite y ESLint completo aprobados. Se revisó `git diff --check`. No se midió capacidad de producción, no se probaron ticketera real ni conexiones PostgreSQL independientes. Estado: propuesta para ensayo, no autorización de despliegue automático.
+86 pruebas aprobadas, 0 fallidas; compilación TypeScript/Vite y ESLint completo aprobados. Se revisó `git diff --check`. No se midió capacidad de producción ni se probó ticketera real. Las carreras entre conexiones independientes se verificaron en PostgreSQL 16 con una base de datos desechable en GitHub Actions (sin datos reales). Estado: propuesta para ensayo, no autorización de despliegue automático.
+
+## Ensayo de instalación con PostgreSQL nativo
+
+La comprobación automática `.github/workflows/pos-security.yml` crea PostgreSQL 16 aislado. `scripts/pos-native.test.mjs` rechaza hosts no locales y nombres de base que no empiecen por `huerta_test_`. Reproduce las migraciones gastronómicas y ejercita conexiones psql separadas: creación idempotente, doble cobro, cobro/cierre y reserva/merma. El script también crea y restaura un pg_dump de los datos ficticios para verificar saldos, reservas, snapshots de cierre y permisos. Esto no sustituye el respaldo ni un ensayo del esquema/configuración reales de Supabase.
+
+Las nuevas pruebas de actualización comprueban reversión de DDL al detectar pedidos abiertos, rechazo de inventario ambiguo y conservación de stock/costo/ventas/cierres históricos. No se habilita automáticamente instalación ni emisión SUNAT.
