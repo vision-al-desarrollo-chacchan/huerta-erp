@@ -50,7 +50,11 @@ console.log('PASS native independent connections: duplicate payment cannot dupli
 // A second order exercises pay versus close. Hold the same cash lock briefly in one connection.
 const second=tail(await sql(create('second','Mesa 2')));
 await sql(as(cook,`select rest_actualizar_estado_pedido('${second}','preparando',null);select rest_actualizar_estado_pedido('${second}','listo',null);select rest_actualizar_estado_pedido('${second}','entregado',null)`));
-const slowPay=as(cashier,`select id from rest_cajas where id='${cash}' for update;select pg_sleep(0.25);select rest_actualizar_estado_pedido('${second}','pagado','Efectivo')`);
+// Test-only server delay: cashier has no direct UPDATE/FOR UPDATE privilege on cash tables.
+await sql(`create function public.fixture_delayed_pay(p_order uuid,p_cash uuid) returns void language plpgsql security definer set search_path=public,pg_temp as $$begin
+ perform 1 from public.rest_cajas where id=p_cash for update;perform pg_sleep(0.25);
+ perform public.rest_actualizar_estado_pedido(p_order,'pagado','Efectivo');end$$;`);
+const slowPay=as(cashier,`select fixture_delayed_pay('${second}','${cash}')`);
 const close=as(cashier,`select rest_cerrar_caja_con_fondo('${cash}',130,0,null)`);
 const race=await Promise.allSettled([sql(slowPay),sql(close)]);
 assert.equal(race[0].status,'fulfilled');

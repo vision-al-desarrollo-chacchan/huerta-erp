@@ -1,8 +1,6 @@
 name: POS security and installation tests
 on:
   pull_request:
-  push:
-    branches: [fix/pos-security-integrity]
 permissions:
   contents: read
 jobs:
