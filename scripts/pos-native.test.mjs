@@ -8,7 +8,8 @@ const url = new URL(connection);
 if (!['127.0.0.1','localhost','[::1]'].includes(url.hostname) || !/^\/huerta_test_[a-z0-9_]+$/.test(url.pathname)) throw new Error('Refusing a non-local or non-test database.');
 function sql(statement) {
  return new Promise((resolve,reject)=>{
-  const child=spawn('psql',['--no-psqlrc','-v','ON_ERROR_STOP=1','-At',connection,'-c',statement],{stdio:['ignore','pipe','pipe']});
+  const child=spawn('psql',['--no-psqlrc','-v','ON_ERROR_STOP=1','-At',connection,'-f','-'],{stdio:['pipe','pipe','pipe']});
+  child.stdin.on('error',()=>{});child.stdin.end(statement);
   let output='',error='';child.stdout.on('data',v=>output+=v);child.stderr.on('data',v=>error+=v);
   child.on('error',reject);child.on('close',code=>code===0?resolve(output.trim()):reject(new Error(error.trim())));
  });
