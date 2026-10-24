@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getBusinessContext, getCashSession, getCurrentStaffName, getOrders } from '../services/restaurant-store';
 
@@ -20,15 +20,15 @@ export default function Arqueo() {
   const salesOnlyMode = true; // Chicken Huerta: por ahora solo resumen/cierre de ventas
   const [salesSummary, setSalesSummary] = useState<{ name: string; quantity: number; total: number }[]>([]);
 
-  async function selectAudit(next: Audit) {
+  const selectAudit = useCallback(async (next: Audit) => {
     const { data, error: requestError } = await supabase.from('rest_arqueo_items').select('*').eq('arqueo_id', next.id).order('nombre');
     if (requestError) throw requestError;
     setAudit(next);
     setLines((data ?? []).map(x => ({ ...x, stock_inicial: Number(x.stock_inicial), comprado: Number(x.comprado), vendido: Number(x.vendido), otras_salidas: Number(x.otras_salidas), stock_esperado: Number(x.stock_esperado), costo_unitario: Number(x.costo_unitario), conteo: x.conteo == null ? null : Number(x.conteo) })));
     setCounts(Object.fromEntries((data ?? []).filter(x => x.conteo != null).map(x => [x.insumo_id, String(x.conteo)])));
     setNotes(next.observaciones ?? '');
-  }
-  async function load() {
+  }, []);
+  const load = useCallback(async () => {
     const [{ empresaId }, cash] = await Promise.all([getBusinessContext(), getCashSession(true)]);
     setCashId(cash?.id ?? null);
     const { data, error: requestError } = await supabase.from('rest_arqueos').select('*').eq('empresa_id', empresaId).order('iniciado_at', { ascending: false }).limit(20);
@@ -36,7 +36,14 @@ export default function Arqueo() {
     const audits = (data ?? []) as Audit[];
     setHistory(audits);
     const current = audits.find(x => x.caja_id === cash?.id) ?? audits[0];
-    const orders = await getOrders();
+    const orders = [];
+    if (cash) {
+      for (let page = 0; ; page++) {
+        const batch = await getOrders({ page, status: 'pagado', cashId: cash.id });
+        orders.push(...batch);
+        if (batch.length < 100) break;
+      }
+    }
     const shiftOrders = cash?.id ? orders.filter(order => order.cashSessionId === cash.id && order.status === 'pagado') : [];
     const summary = new Map<string, { name: string; quantity: number; total: number }>();
     shiftOrders.flatMap(order => order.items).forEach(item => {
@@ -49,8 +56,8 @@ export default function Arqueo() {
     setSalesSummary([...summary.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)));
     if (current) await selectAudit(current);
     else { setAudit(null); setLines([]); }
-  }
-  useEffect(() => { void load().catch(e => setError(String(e.message ?? e))).finally(() => setLoading(false)); }, []);
+  }, [selectAudit]);
+  useEffect(() => { let active = true; Promise.resolve().then(() => { if (active) return load(); }).catch(e => { if (active) setError(String(e.message ?? e)); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [load]);
 
   async function start(refresh = false) {
     if (!cashId) return;

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Banknote, CheckCircle, LockKeyhole, Printer, WalletCards } from 'lucide-react';
-import { closeCash, getCashMovements, getCashSession, getCurrentStaffName, getOrders, openCash, orderTotal, registerCashMovement, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
+import { closeCash, getCashMovements, getCashSession, getCurrentStaffName, getCashOrders, getCashSummary, type CashSummary, openCash, orderTotal, registerCashMovement, subscribeRestaurantData, updateOrderStatus } from '../services/restaurant-store';
 import type { CashMovement, CashSession, RestaurantOrder } from '../types/restaurant';
 
 const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -17,6 +17,7 @@ function errorMessage(reason: unknown, fallback: string) {
 
 export default function Caja() {
   const [session, setSession] = useState<CashSession | null>(null);
+  const [summary, setSummary] = useState<CashSummary>({ sales: 0, payments: {}, cashMovementNet: 0 });
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [amount, setAmount] = useState('50');
   const [countedAmount, setCountedAmount] = useState('');
@@ -37,7 +38,7 @@ export default function Caja() {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     const load = async () => {
-      try { const [cash, currentOrders, currentStaff, currentMovements] = await Promise.all([getCashSession(), getOrders(), getCurrentStaffName(), getCashMovements()]); setSession(cash); setOrders(currentOrders); setStaffName(currentStaff); setMovements(currentMovements); }
+      try { const [cash, currentOrders, currentStaff, currentMovements, currentSummary] = await Promise.all([getCashSession(), getCashOrders(), getCurrentStaffName(), getCashMovements(), getCashSummary()]); setSession(cash); setOrders(currentOrders); setStaffName(currentStaff); setMovements(currentMovements); setSummary(currentSummary); }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo cargar la caja.'); }
       finally { setLoading(false); }
     };
@@ -48,16 +49,16 @@ export default function Caja() {
   const currentCashOrders = session ? orders.filter((order) => order.cashSessionId === session.id) : [];
   const delivered = currentCashOrders.filter((order) => order.status === 'entregado');
   const paid = currentCashOrders.filter((order) => order.status === 'pagado');
-  const salesTotal = paid.reduce((sum, order) => sum + orderTotal(order), 0);
-  const paymentTotals = paid.reduce<Record<string, number>>((totals, order) => { const method = order.paymentMethod ?? 'Sin método'; totals[method] = (totals[method] ?? 0) + orderTotal(order); return totals; }, {});
-  const cashMovementNet = movements.filter((item) => item.paymentMethod === 'Efectivo').reduce((sum, item) => sum + (item.type === 'ingreso' ? item.amount : -item.amount), 0);
+  const salesTotal = summary.sales;
+  const paymentTotals = summary.payments;
+  const cashMovementNet = summary.cashMovementNet;
   const expectedCash = (session?.openingAmount ?? 0) + (paymentTotals.Efectivo ?? 0) + cashMovementNet;
   const displayedCountedAmount = countedAmount === '' ? expectedCash.toFixed(2) : countedAmount;
   const closingDifference = Number(displayedCountedAmount) - expectedCash;
 
   async function refresh() {
-    const [cash, currentOrders, currentMovements] = await Promise.all([getCashSession(), getOrders(), getCashMovements()]);
-    setSession(cash); setOrders(currentOrders); setMovements(currentMovements);
+    const [cash, currentOrders, currentMovements, currentSummary] = await Promise.all([getCashSession(), getCashOrders(), getCashMovements(), getCashSummary()]);
+    setSession(cash); setOrders(currentOrders); setMovements(currentMovements); setSummary(currentSummary);
   }
 
   async function collect(order: RestaurantOrder) {
@@ -69,6 +70,7 @@ export default function Caja() {
       await updateOrderStatus(order.id, 'pagado', paymentMethod);
       const paidOrder = { ...order, status: 'pagado' as const, paymentMethod };
       setSaleReceipt({ order: paidOrder, paymentMethod, chargedAt: new Date().toISOString() });
+      void refresh().catch(() => setError('Cobro registrado. Actualiza la pantalla para consultar los totales.'));
     } catch (reason) {
       setOrders((current) => current.map((item) => item.id === order.id ? order : item));
       setError(reason instanceof Error ? reason.message : 'No se pudo cobrar el pedido.');
@@ -89,7 +91,7 @@ export default function Caja() {
     setBusyAction('close'); setError('');
     try {
       const closed = await closeCash(Number(displayedCountedAmount), Number(nextShiftFund), closingNotes);
-      setClosedReport({ session: closed, payments: { ...paymentTotals }, movements: [...movements] });
+      setClosedReport({ session: closed, payments: closed.paymentSnapshot ?? {}, movements: closed.movementSnapshot ?? [] });
       setSession(null);
     } catch (reason) {
       setError(errorMessage(reason, 'No se pudo cerrar la caja.'));

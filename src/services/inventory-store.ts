@@ -82,74 +82,29 @@ type RecipeRow = {
   } | null;
 };
 export async function getSupplies(): Promise<Supply[]> {
-  const { empresaId } = await getBusinessContext();
-  const { data, error } = await supabase
-    .from("rest_insumos")
-    .select(
-      "id,codigo,nombre,categoria,unidad,stock,stock_minimo,costo_promedio",
-    )
-    .eq("empresa_id", empresaId)
-    .eq("activo", true)
-    .order("nombre");
+  const { empresaId, sucursalId } = await getBusinessContext();
+  const rows: Supply[] = [];
+  for (let start = 0; ; start += 100) {
+    const { data, error } = await supabase.from('rest_insumos').select('id,codigo,nombre,categoria,unidad,stock,stock_minimo,costo_promedio')
+      .eq('empresa_id', empresaId).eq('sucursal_id', sucursalId).eq('activo', true).order('nombre').order('id').range(start, start + 99);
+    if (error) throw error;
+    rows.push(...(data ?? []).map(x => ({ id: x.id, code: x.codigo, name: x.nombre, category: x.categoria, unit: x.unidad,
+      stock: Number(x.stock), minStock: Number(x.stock_minimo), averageCost: Number(x.costo_promedio) })));
+    if (!data || data.length < 100) return rows;
+  }
+}
+export async function saveSupply(input: Omit<Supply, "id"> & { id?: string }): Promise<Supply> {
+  const { empresaId, sucursalId } = await getBusinessContext();
+  const { data, error } = await supabase.rpc('rest_guardar_insumo', {
+    p_empresa_id: empresaId, p_sucursal_id: sucursalId, p_codigo: input.code.trim(), p_nombre: input.name.trim(),
+    p_categoria: input.category.trim(), p_unidad: input.unit, p_stock: input.stock, p_minimo: input.minStock,
+    p_costo: input.averageCost, p_id: input.id ?? null,
+  });
   if (error) throw error;
-  return (data ?? []).map((x) => ({
-    id: x.id,
-    code: x.codigo,
-    name: x.nombre,
-    category: x.categoria,
-    unit: x.unidad,
-    stock: Number(x.stock),
-    minStock: Number(x.stock_minimo),
-    averageCost: Number(x.costo_promedio),
-  }));
+  return { id: data.id, code: data.codigo, name: data.nombre, category: data.categoria, unit: data.unidad,
+    stock: Number(data.stock), minStock: Number(data.stock_minimo), averageCost: Number(data.costo_promedio) };
 }
-export async function saveSupply(input: Omit<Supply, "id"> & { id?: string }) {
-  const { empresaId } = await getBusinessContext();
-  const row = {
-    empresa_id: empresaId,
-    codigo: input.code.trim(),
-    nombre: input.name.trim(),
-    categoria: input.category,
-    unidad: input.unit,
-    stock: input.stock,
-    stock_minimo: input.minStock,
-    costo_promedio: input.averageCost,
-  };
-  const result = input.id
-    ? await supabase.from("rest_insumos").update(row).eq("id", input.id)
-    : await supabase.from("rest_insumos").insert(row);
-  if (result.error) throw result.error;
-}
-export async function createSupply(input: Omit<Supply, "id">): Promise<Supply> {
-  const { empresaId } = await getBusinessContext();
-  const { data, error } = await supabase
-    .from("rest_insumos")
-    .insert({
-      empresa_id: empresaId,
-      codigo: input.code.trim(),
-      nombre: input.name.trim(),
-      categoria: input.category.trim(),
-      unidad: input.unit,
-      stock: input.stock,
-      stock_minimo: input.minStock,
-      costo_promedio: input.averageCost,
-    })
-    .select(
-      "id,codigo,nombre,categoria,unidad,stock,stock_minimo,costo_promedio",
-    )
-    .single();
-  if (error) throw error;
-  return {
-    id: data.id,
-    code: data.codigo,
-    name: data.nombre,
-    category: data.categoria,
-    unit: data.unidad,
-    stock: Number(data.stock),
-    minStock: Number(data.stock_minimo),
-    averageCost: Number(data.costo_promedio),
-  };
-}
+export async function createSupply(input: Omit<Supply, "id">): Promise<Supply> { return saveSupply(input); }
 export async function registerInventoryMovement(
   supplyId: string,
   type: string,
@@ -259,13 +214,14 @@ export async function getDailyInventorySummary(date: string): Promise<DailyInven
   }));
 }
 export async function getRecipeLines(): Promise<RecipeLine[]> {
-  const { empresaId } = await getBusinessContext();
+  const { empresaId, sucursalId } = await getBusinessContext();
   const { data, error } = await supabase
     .from("rest_recetas")
     .select(
-      "id,cantidad,cantidad_uso,unidad_uso,rest_productos(nombre),rest_insumos(nombre,unidad,costo_promedio)",
+      "id,cantidad,cantidad_uso,unidad_uso,rest_productos(nombre),rest_insumos!inner(nombre,unidad,costo_promedio,sucursal_id)",
     )
     .eq("empresa_id", empresaId)
+    .eq("rest_insumos.sucursal_id", sucursalId)
     .order("created_at");
   if (error) throw error;
   return ((data ?? []) as unknown as RecipeRow[]).map((x) => ({

@@ -1,0 +1,39 @@
+name: POS security and installation tests
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: huerta_test_install
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d huerta_test_install"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts
+        working-directory: supabase/functions/_shared/sunat-signing
+      - run: npm run build
+      - run: npm run lint
+      - name: Offline and upgrade tests
+        run: node --test scripts/refresh-scheduler.test.mjs src/services/sunat/run-offline-tests.mjs supabase/functions/_shared/sunat-signing/*.test.mjs
+      - name: Native PostgreSQL permissions and independent connection races
+        env:
+          HUERTA_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/huerta_test_install
+        run: node scripts/pos-native.test.mjs

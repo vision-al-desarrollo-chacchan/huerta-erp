@@ -1,3 +1,5 @@
+import { beginOperation, finishOperation } from '../lib/durable-operation';
+import { supabase } from '../lib/supabase';
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Minus, Pencil, Plus, Search, ShoppingBag, Trash2, Users, X } from 'lucide-react';
 import { addItemsToOrder, createOrder, createProduct, deactivateProduct, getCashSession, getOrders, activeOrderStates, mergeOrderChanges, type RestaurantChange, getProducts, subscribeProducts, subscribeRestaurantData, updateProduct } from '../services/restaurant-store';
@@ -134,26 +136,40 @@ export default function Ventas() {
       setSending(false);
       return;
     }
-    if (!cart.length) {
+    const { data: { user } } = await supabase.auth.getUser();
+    const operationScope = user ? `huerta-order:${user.id}:${cash.id}` : '';
+    if (!cart.length && !localStorage.getItem(operationScope)) {
       setNotice('Agrega al menos un producto.');
       setSending(false);
       return;
     }
     try {
-      const additionKey = crypto.randomUUID();
-      const order = activeTableOrder
-        ? await addItemsToOrder(activeTableOrder.id, cart, additionKey)
-        : await createOrder({ serviceType, table: serviceType === 'salon' ? table : undefined, items: cart });
-      void enqueueOrderPrint(order, 'cocina', activeTableOrder ? `addition:${additionKey}` : 'v1').catch(() => {
-        // La venta queda guardada; la alerta y el reintento se muestran en el centro de impresión.
+      if (!user) throw new Error('Inicia sesión de nuevo.');
+      const pending = beginOperation(localStorage, operationScope, {
+        orderId: activeTableOrder?.id,
+        order: { serviceType, table: serviceType === 'salon' ? table : undefined, items: cart },
       });
-      setCart([]);
-      const message = activeTableOrder
+      // A pending ambiguous request always takes precedence over an edited cart.
+      const additionKey = pending.key;
+      const order = pending.request.orderId
+        ? await addItemsToOrder(pending.request.orderId, pending.request.order.items, additionKey)
+        : await createOrder(pending.request.order, additionKey);
+      finishOperation(localStorage, operationScope, pending.key);
+      void enqueueOrderPrint(order, 'cocina', pending.request.orderId ? `addition:${additionKey}` : 'v1').catch(() => {
+        notify('Pedido guardado. Revisa la cola de impresión para confirmar su salida.', 'error');
+      });
+      const sameCart = JSON.stringify(pending.request.order.items) === JSON.stringify(cart) && pending.request.order.serviceType === serviceType && pending.request.order.table === (serviceType === 'salon' ? table : undefined);
+      if (sameCart) setCart([]);
+      const message = pending.request.orderId
         ? `Productos agregados al pedido #${String(order.number).padStart(3, '0')} y enviados a cocina.`
         : `Pedido #${String(order.number).padStart(3, '0')} enviado correctamente a cocina.`;
-      setNotice(message);
-      notify(message, 'success');
+      const resultMessage = sameCart ? message : `${message} Se conservó el carrito actual.`;
+      setNotice(resultMessage);
+      notify(resultMessage, 'success');
     } catch (reason) {
+      // SQL validation/permission errors guarantee rollback. Transport failures keep the pending key.
+      const code = typeof reason === 'object' && reason && 'code' in reason ? String(reason.code) : '';
+      if (/^(P0001|22\w{3}|23\w{3}|42501)$/.test(code)) localStorage.removeItem(operationScope);
       const message = userErrorMessage(reason, 'No se pudo registrar el pedido.');
       setNotice(message);
       notify(message, 'error');
