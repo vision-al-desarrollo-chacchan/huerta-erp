@@ -12,16 +12,19 @@ export default function OperatorRoute({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let checking = false;
     const check = () => {
+      if (checking) return;
+      checking = true;
       void getCompanyAccess().then(value => {
         if (mounted) { setAccess(value); setAccessError(''); }
-      }).catch(reason => { if (mounted) setAccessError(platformError(reason)); });
+      }).catch(reason => { if (mounted) setAccessError(platformError(reason)); }).finally(() => { checking = false; });
     };
     check();
     const timer = window.setInterval(check, 15000);
     window.addEventListener('focus', check);
     return () => { mounted = false; window.clearInterval(timer); window.removeEventListener('focus', check); };
-  }, [location.pathname]);
+  }, []);
 
   useEffect(() => {
     const refresh = () => setOperator(getActiveOperator());

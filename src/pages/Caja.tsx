@@ -43,8 +43,17 @@ export default function Caja() {
       finally { setLoading(false); }
     };
     void load();
-    void subscribeRestaurantData(load).then((cleanup) => { unsubscribe = cleanup; }).catch((reason: Error) => setError(reason.message));
-    return () => unsubscribe?.();
+    let disposed = false;
+    void subscribeRestaurantData(load).then((cleanup) => {
+      if (disposed) cleanup();
+      else unsubscribe = cleanup;
+    }).catch((reason: Error) => {
+      if (!disposed) setError(reason.message);
+    });
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
   }, []);
   const currentCashOrders = session ? orders.filter((order) => order.cashSessionId === session.id) : [];
   const delivered = currentCashOrders.filter((order) => order.status === 'entregado');
