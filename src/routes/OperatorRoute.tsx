@@ -21,7 +21,7 @@ export default function OperatorRoute({ children }: { children: ReactNode }) {
     const timer = window.setInterval(check, 15000);
     window.addEventListener('focus', check);
     return () => { mounted = false; window.clearInterval(timer); window.removeEventListener('focus', check); };
-  }, [location.pathname]);
+  }, []);
 
   useEffect(() => {
     const refresh = () => setOperator(getActiveOperator());
