@@ -12,10 +12,13 @@ export default function OperatorRoute({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let checking = false;
     const check = () => {
+      if (checking) return;
+      checking = true;
       void getCompanyAccess().then(value => {
         if (mounted) { setAccess(value); setAccessError(''); }
-      }).catch(reason => { if (mounted) setAccessError(platformError(reason)); });
+      }).catch(reason => { if (mounted) setAccessError(platformError(reason)); }).finally(() => { checking = false; });
     };
     check();
     const timer = window.setInterval(check, 15000);
