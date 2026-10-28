@@ -15,3 +15,18 @@ test('lee aceptación, observaciones y rechazo del CDR',()=>{assert.equal(parseB
 test('rechaza CDR ajeno, ZIP ambiguo y DTD',()=>{assert.throws(()=>parseBetaResponse(response({id:'F001-2'})));assert.throws(()=>parseBetaResponse(response({extra:true})));assert.throws(()=>parseBetaResponse('<!DOCTYPE x>'+response()));});
 test('SOAP Fault se registra como rechazo beta',()=>{const xml='<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>3030</faultcode><faultstring>Prueba</faultstring></s:Fault></s:Body></s:Envelope>';assert.equal(parseBetaResponse(xml).code,'3030');});
 test('transporte fija beta, credenciales ficticias y bloqueo de redirecciones',async()=>{const f=await buildBetaFixture();let calls=0;const result=await sendBetaFixture(f,async(url,options)=>{calls++;assert.equal(url,'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService');assert.equal(options.redirect,'error');assert.ok(options.body.includes('20123456789MODDATOS'));assert.ok(options.signal);return new Response(response());});assert.equal(calls,1);assert.equal(result.status,'aceptado');});
+
+test('boleta ficticia firma resumen B001-1 y envía solo a beta', async () => {
+  const fixture=await buildBetaFixture('03',{id:'11111111-1111-4111-8111-111111111111',created_at:'2026-10-28T03:00:00Z'});
+  assert.match(fixture.xml, /<cbc:DocumentTypeCode>03<\/cbc:DocumentTypeCode>/);
+  assert.match(fixture.xml, /B001-1/);
+  assert.match(fixture.xml, /<ds:Signature/);
+  assert.match(fixture.summaryId,/^RC-20261027-/);
+  const result=await sendBetaFixture(fixture,async(url,options)=>{
+    assert.equal(url,'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService');
+    assert.equal(options.headers.SOAPAction,'urn:sendSummary');
+    assert.equal(options.redirect,'error');
+    return new Response('<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><r:sendSummaryResponse xmlns:r="http://service.sunat.gob.pe"><ticket>123456</ticket></r:sendSummaryResponse></s:Body></s:Envelope>');
+  });
+  assert.equal(result.status,'enviando'); assert.equal(result.ticket,'123456');
+});

@@ -18,11 +18,15 @@ insert into auth.users values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),('bbbbbbb
 insert into rest_empresas values ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
 insert into rest_miembros values ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true,'propietario'),('22222222-2222-4222-8222-222222222222','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true,'administrador'),('11111111-1111-4111-8111-111111111111','cccccccc-cccc-4ccc-8ccc-cccccccccccc',true,'mozo');`);
 await db.exec(readFileSync(fileURLToPath(new URL('../../../migrations/20261012170000_sunat_beta_pruebas.sql', import.meta.url)),'utf8'));
+await db.exec(readFileSync(fileURLToPath(new URL('../../../migrations/20261028053034_sunat_beta_receipt.sql', import.meta.url)),'utf8'));
 const company='11111111-1111-4111-8111-111111111111',key='99999999-9999-4999-8999-999999999999';
 async function user(id){await db.exec(`reset role;set role authenticated;set request.jwt.claim.sub='${id}';`);}
 const reserve=(company,key)=>db.query('select (public.ef_sunat_beta_reservar($1,$2)).*',[company,key]);
 await user('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const first=(await reserve(company,key)).rows[0];const second=(await reserve(company,key)).rows[0];assert.equal(first.id,second.id);console.log('PASS idempotency');
+await assert.rejects(db.query('select public.ef_sunat_beta_reservar($1,$2,$3)',[company,key,'03']));
+await assert.rejects(db.query('select public.ef_sunat_beta_reservar($1,$2,$3)',[company,key,'07']));
+console.log('PASS document type bound to idempotency key');
 await assert.rejects(reserve('22222222-2222-4222-8222-222222222222',key));console.log('PASS denies other company');
 await assert.rejects(reserve(company,'88888888-8888-4888-8888-888888888888'));console.log('PASS rate/in-flight limit');
 await assert.rejects(db.query('update ef_sunat_beta_pruebas set estado=\'aceptado\''));console.log('PASS frontend write denied');

@@ -1,7 +1,8 @@
 import { supabase } from '../../lib/supabase';
 import { getBusinessContext } from '../restaurant-store';
+export type SunatBetaDocumentType = '01' | '03';
 export type SunatBetaState = 'pendiente' | 'enviando' | 'aceptado' | 'observado' | 'rechazado' | 'error' | 'incierto';
-export type SunatBetaResult = { id: string; empresaId: string; estado: SunatBetaState; codigo?: string | null; mensaje?: string | null; observaciones: string[] };
+export type SunatBetaResult = { id: string; empresaId: string; estado: SunatBetaState; documentType?: SunatBetaDocumentType; codigo?: string | null; mensaje?: string | null; observaciones: string[] };
 export async function getSunatBetaAccess() {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new Error('Inicia sesión para consultar las pruebas SUNAT.');
@@ -11,12 +12,12 @@ export async function getSunatBetaAccess() {
   return { empresaId, userId: user.id, allowed: !!member && ['propietario', 'administrador'].includes(member.rol) };
 }
 export async function getSunatBetaResult(empresaId: string, idempotencyKey: string): Promise<SunatBetaResult | null> {
-  const { data, error } = await supabase.from('ef_sunat_beta_pruebas').select('id,empresa_id,estado,codigo_sunat,mensaje_sunat,observaciones').eq('empresa_id', empresaId).eq('idempotency_key', idempotencyKey).maybeSingle();
+  const { data, error } = await supabase.from('ef_sunat_beta_pruebas').select('id,empresa_id,estado,codigo_sunat,mensaje_sunat,observaciones,document_type').eq('empresa_id', empresaId).eq('idempotency_key', idempotencyKey).maybeSingle();
   if (error) throw new Error('No se pudo consultar el resultado de la prueba SUNAT.');
-  return data ? { id: data.id, empresaId: data.empresa_id, estado: data.estado, codigo: data.codigo_sunat, mensaje: data.mensaje_sunat, observaciones: Array.isArray(data.observaciones) ? data.observaciones : [] } : null;
+  return data ? { id: data.id, empresaId: data.empresa_id, estado: data.estado, documentType: data.document_type, codigo: data.codigo_sunat, mensaje: data.mensaje_sunat, observaciones: Array.isArray(data.observaciones) ? data.observaciones : [] } : null;
 }
-export async function runSunatBetaTest(empresaId: string, idempotencyKey: string): Promise<SunatBetaResult> {
-  const { data, error } = await supabase.functions.invoke('electronic-billing-beta', { body: { empresaId, idempotencyKey } });
+export async function runSunatBetaTest(empresaId: string, idempotencyKey: string, documentType: SunatBetaDocumentType = '01'): Promise<SunatBetaResult> {
+  const { data, error } = await supabase.functions.invoke('electronic-billing-beta', { body: { empresaId, idempotencyKey, documentType } });
   if (error) {
     // Una respuesta HTTP 502 puede contener un resultado incierto ya guardado.
     if (error.context instanceof Response) {
