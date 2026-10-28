@@ -14,6 +14,7 @@ let xml;
 test('resumen diario de boleta firmado y alteraciones rechazadas',()=>{
  xml=signSunatXml({xml:buildReceiptSummary(draft,summaryId,'2026-10-13'),...fixture});
  assert.equal(verifySunatXml(xml,fixture.certificatePem),true);
+ assert.match(xml, /<cac:TaxCategory><cbc:Percent>18\.00<\/cbc:Percent><cac:TaxScheme>/);
  assert.throws(()=>verifySunatXml(xml.replace('11.80','12.80'),fixture.certificatePem));
  assert.throws(()=>buildReceiptSummary({...draft,documentType:'01',series:'F001'},summaryId,'2026-10-13'));
  assert.throws(()=>buildReceiptSummary(draft,'RC-20261013-0','2026-10-13'));
@@ -34,4 +35,15 @@ test('ticket en proceso y CDR de resumen aceptado/rechazado/ajeno',async()=>{
  const cdr=(id,code)=>Buffer.from(zipSync({'R-resumen.xml':strToU8(`<ApplicationResponse xmlns="urn:oasis:names:specification:ubl:schema:xsd:ApplicationResponse-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><cac:DocumentResponse><cac:Response><cbc:ReferenceID>${id}</cbc:ReferenceID><cbc:ResponseCode>${code}</cbc:ResponseCode><cbc:Description>Prueba ficticia</cbc:Description></cac:Response></cac:DocumentResponse></ApplicationResponse>`)})).toString('base64');
  for(const code of ['0','2001'])assert.equal((await consultReceiptTicket(input,async()=>response('getStatus',`<status><statusCode>0</statusCode><content>${cdr(summaryId,code)}</content></status>`))).status,code==='0'?'aceptado':'rechazado');
  await assert.rejects(consultReceiptTicket(input,async()=>response('getStatus',`<status><statusCode>0</statusCode><content>${cdr('RC-20261013-2','0')}</content></status>`)));
+});
+
+test('rechazo explícito 2992 se conserva como rechazo sin ticket; fallo servidor permanece incierto',async()=>{
+ const input={xml,ruc:credentials.ruc,summaryId,credentials,environment:'beta'};
+ const fault=(code,status=200)=>new Response(`<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>${code}</faultcode><faultstring>Tasa faltante</faultstring></s:Fault></s:Body></s:Envelope>`,{status});
+ for(const status of [200,500]){
+  const result=await sendSignedReceiptSummary(input,async()=>fault('soap-env:Client.2992',status));
+  assert.equal(result.status,'rechazado');assert.equal(result.code,'2992');assert.equal(result.ticket,undefined);
+ }
+ await assert.rejects(sendSignedReceiptSummary(input,async()=>fault('s:Server.0100',500)));
+ await assert.rejects(sendSignedReceiptSummary(input,async()=>{throw new Error('timeout');}));
 });

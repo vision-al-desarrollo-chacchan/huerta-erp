@@ -19,8 +19,22 @@ async function summaryCall(method, payload, credentials, environment, authorized
   const body=`<?xml version="1.0"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.sunat.gob.pe">${buildSunatSecurityHeader(credentials)}<soapenv:Body><ser:${method}>${payload}</ser:${method}></soapenv:Body></soapenv:Envelope>`;
   const response=await fetchImpl(getSunatEndpoint(environment,authorized),{method:'POST',redirect:'error',signal:AbortSignal.timeout(30_000),headers:{'Content-Type':'text/xml; charset=utf-8',SOAPAction:`urn:${method}`},body});
   const xml=await readResponse(response);
-  if(!response.ok||/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('Resumen SUNAT no confirmado.');
+  if(/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('Resumen SUNAT no confirmado.');
   const document=new DOMParser({onError:()=>{throw new Error('XML inválido.');}}).parseFromString(xml,'application/xml');
+  const faults=Array.from(document.getElementsByTagNameNS('http://schemas.xmlsoap.org/soap/envelope/','Fault'));
+  if (faults.length === 1) {
+    const children=Array.from(faults[0].childNodes).filter(n=>n.nodeType===1);
+    const codes=children.filter(n=>n.localName==='faultcode');
+    const messages=children.filter(n=>n.localName==='faultstring');
+    const match=codes.length===1 ? /^(?:[\w-]+:)?Client\.(\d{4})$/.exec(codes[0].textContent.trim()) : null;
+    if(match && messages.length===1) {
+      const error=new Error('SUNAT rechazó el resumen.');
+      error.sunatRejection={status:'rechazado',code:match[1],message:messages[0].textContent.slice(0,2000),notes:[],cdr:null};
+      throw error;
+    }
+    throw new Error('SOAP Fault sin rechazo confirmado.');
+  }
+  if(!response.ok)throw new Error('Resumen SUNAT no confirmado.');
   const replies=Array.from(document.getElementsByTagNameNS('http://service.sunat.gob.pe',method+'Response'));
   if(replies.length!==1)throw new Error('Respuesta SUNAT de resumen inválida.');
   return replies[0];
@@ -30,7 +44,9 @@ export async function sendSignedReceiptSummary({ xml, ruc, summaryId, credential
   if(!/^\d{11}$/.test(ruc)||!/^RC-\d{8}-[1-9]\d{0,4}$/.test(summaryId)||credentials.ruc!==ruc||typeof xml!=='string'||Buffer.byteLength(xml)>2_000_000||!xml.includes('<ds:Signature'))throw new Error('Resumen firmado inválido.');
   const name=`${ruc}-${summaryId}`;
   const payload=`<fileName>${name}.zip</fileName><contentFile>${Buffer.from(zipSync({[name+'.xml']:strToU8(xml)})).toString('base64')}</contentFile>`;
-  const reply=await summaryCall('sendSummary',payload,credentials,environment,authorized,fetchImpl);
+  let reply;
+  try { reply=await summaryCall('sendSummary',payload,credentials,environment,authorized,fetchImpl); }
+  catch(error) { if(error.sunatRejection)return error.sunatRejection; throw error; }
   const tickets=Array.from(reply.getElementsByTagName('*')).filter(node=>node.localName==='ticket');
   if(tickets.length!==1||!/^\d{1,128}$/.test(tickets[0].textContent))throw new Error('Ticket SUNAT inválido.');
   return {status:'enviando',ticket:tickets[0].textContent,message:'Resumen de boleta recibido por SUNAT. Consulta el ticket para obtener el CDR.'};
@@ -66,7 +82,7 @@ export async function consultInvoiceCdr({ ruc, series, number, credentials, auth
   const soap=`<?xml version="1.0"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.sunat.gob.pe">${buildSunatSecurityHeader(credentials)}<soapenv:Body><ser:getStatusCdr><rucComprobante>${ruc}</rucComprobante><tipoComprobante>01</tipoComprobante><serieComprobante>${series}</serieComprobante><numeroComprobante>${number}</numeroComprobante></ser:getStatusCdr></soapenv:Body></soapenv:Envelope>`;
   const response=await fetchImpl('https://e-factura.sunat.gob.pe/ol-it-wsconscpegem/billConsultService',{method:'POST',redirect:'error',signal:AbortSignal.timeout(30_000),headers:{'Content-Type':'text/xml; charset=utf-8',SOAPAction:'urn:getStatusCdr'},body:soap});
   const xml=await readResponse(response);
-  if(!response.ok||/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('Consulta SUNAT no confirmada.');
+  if(/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('Consulta SUNAT no confirmada.');
   const root=new DOMParser({onError:()=>{throw new Error('XML inválido.');}}).parseFromString(xml,'application/xml');
   const replies=Array.from(root.getElementsByTagNameNS('http://service.sunat.gob.pe','getStatusCdrResponse'));
   if(replies.length!==1)throw new Error('Respuesta de consulta inválida.');

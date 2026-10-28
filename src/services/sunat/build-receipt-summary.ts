@@ -21,6 +21,6 @@ ${draft.receiverDocumentType==='0'?'':`<cac:AccountingCustomerParty><cbc:Custome
 <cac:Status><cbc:ConditionCode>1</cbc:ConditionCode></cac:Status>
 <sac:TotalAmount currencyID="PEN">${money(totals.grossCents)}</sac:TotalAmount>
 <sac:BillingPayment><cbc:PaidAmount currencyID="PEN">${money(totals.taxableCents)}</cbc:PaidAmount><cbc:InstructionID>01</cbc:InstructionID></sac:BillingPayment>
-<cac:TaxTotal><cbc:TaxAmount currencyID="PEN">${money(totals.taxCents)}</cbc:TaxAmount><cac:TaxSubtotal><cbc:TaxAmount currencyID="PEN">${money(totals.taxCents)}</cbc:TaxAmount><cac:TaxCategory><cac:TaxScheme><cbc:ID>1000</cbc:ID><cbc:Name>IGV</cbc:Name><cbc:TaxTypeCode>VAT</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
+<cac:TaxTotal><cbc:TaxAmount currencyID="PEN">${money(totals.taxCents)}</cbc:TaxAmount><cac:TaxSubtotal><cbc:TaxAmount currencyID="PEN">${money(totals.taxCents)}</cbc:TaxAmount><cac:TaxCategory><cbc:Percent>18.00</cbc:Percent><cac:TaxScheme><cbc:ID>1000</cbc:ID><cbc:Name>IGV</cbc:Name><cbc:TaxTypeCode>VAT</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
 </sac:SummaryDocumentsLine></SummaryDocuments>`;
 }

@@ -15,4 +15,10 @@ La migración mantiene la firma RPC anterior para clientes existentes. Los datos
 
 ## Verificación local
 
-`npm run build`, `npm run lint` y la suite offline de 90 pruebas pasaron. No se ha efectuado un envío real de esta nueva boleta beta ni se ha desplegado el cambio en el sitio.
+`npm run build`, `npm run lint` y la suite offline de 90 pruebas pasaron. La verificación inicial no incluyó un envío de boleta beta.
+
+## Corrección del rechazo 2992
+
+SUNAT beta rechazó el resumen por ausencia de `cbc:Percent` dentro de `cac:TaxCategory`. Se agregó 18.00 para las operaciones gravadas admitidas por este generador. Los SOAP Fault Client con código de cuatro dígitos se muestran como rechazo explícito; errores de servidor, transporte o respuesta ambigua continúan sin confirmar.
+
+Una prueba directa ficticia del resumen RC-20261028-21361 obtuvo ticket y aceptación código 0. Esta aceptación valida únicamente el entorno beta, no habilita producción. Los intentos anteriores permanecen sin confirmar; el operador puede preparar otra prueba ficticia con una clave nueva, sin reenviar el intento anterior.
