@@ -1,4 +1,6 @@
 /** Backend beta únicamente: datos ficticios, TLS, sin endpoint configurable ni reintentos. */
+import { buildReceiptSummary } from '../../../../src/services/sunat/build-receipt-summary.ts';
+import { sendSignedReceiptSummary, consultReceiptTicket } from './live-transport.mjs';
 import { randomBytes } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import forge from 'node-forge';
@@ -18,7 +20,8 @@ function parse(xml) {
   if (Buffer.byteLength(xml) > MAX || /<!DOCTYPE|<!ENTITY/i.test(xml)) throw new Error('Respuesta XML fuera de rango.');
   return new DOMParser({ onError: () => { throw new Error('Respuesta XML mal formada.'); } }).parseFromString(xml, 'application/xml');
 }
-export async function buildBetaFixture() {
+export async function buildBetaFixture(documentType = '01', job = {}) {
+  if (!['01', '03'].includes(documentType)) throw new Error('Tipo beta inválido.');
   const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
   const pem = (label, value) => `-----BEGIN ${label}-----\n${Buffer.from(value).toString('base64').match(/.{1,64}/g).join('\n')}\n-----END ${label}-----`;
   const keys = { publicKey: pem('PUBLIC KEY', await crypto.subtle.exportKey('spki', pair.publicKey)), privateKey: pem('PRIVATE KEY', await crypto.subtle.exportKey('pkcs8', pair.privateKey)) };
@@ -30,7 +33,14 @@ export async function buildBetaFixture() {
   const identity = [{ name: 'commonName', value: 'SOLO PRUEBAS HUERTA' }, { name: 'serialNumber', value: '20123456789' }];
   cert.setSubject(identity); cert.setIssuer(identity); cert.sign(forge.pki.privateKeyFromPem(keys.privateKey), forge.md.sha256.create());
   const certificatePem = forge.pki.certificateToPem(cert);
-  const draft = { issuerRuc: '20123456789', issuerName: 'EMPRESA DE PRUEBA SAC', issuerAddress: 'AV. PRUEBA 123', documentType: '01', series: 'F001', number: 1, issueDate: new Date().toISOString().slice(0, 10), currency: 'PEN', receiverDocumentType: '6', receiverDocumentNumber: '20654321098', receiverName: 'CLIENTE FICTICIO', paymentMode: 'Contado', items: [{ description: 'PRODUCTO FICTICIO', quantity: 1, unitPrice: 11.8 }] };
+  const draft = { issuerRuc: '20123456789', issuerName: 'EMPRESA DE PRUEBA SAC', issuerAddress: 'AV. PRUEBA 123', documentType, series: documentType === '03' ? 'B001' : 'F001', number: 1, issueDate: new Date().toISOString().slice(0, 10), currency: 'PEN', receiverDocumentType: documentType === '03' ? '1' : '6', receiverDocumentNumber: documentType === '03' ? '12345678' : '20654321098', receiverName: 'CLIENTE FICTICIO', paymentMode: 'Contado', items: [{ description: 'PRODUCTO FICTICIO', quantity: 1, unitPrice: 11.8 }] };
+  if (documentType === '03') {
+    const date = new Date(new Date(job.created_at ?? Date.now()).getTime() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    draft.issueDate = date;
+    const summaryId = job.summary_id ?? `RC-${date.replaceAll('-', '')}-${1 + parseInt((job.id ?? '00000001').slice(0, 8), 16) % 99999}`;
+    const xml = signSunatXml({ xml: buildReceiptSummary(draft, summaryId, date), certificatePem, privateKeyPem: keys.privateKey });
+    return { xml, summaryId, documentType };
+  }
   const xml = signSunatXml({ xml: buildSunatUblDraft(draft), certificatePem, privateKeyPem: keys.privateKey });
   const fileName = '20123456789-01-F001-1.zip';
   const zip = zipSync({ '20123456789-01-F001-1.xml': strToU8(xml) });
@@ -69,7 +79,12 @@ export function parseBetaResponse(xml, expectedId = 'F001-1') {
   const notes = nodes(application, CBC, 'Note').map(n => n.textContent.slice(0, 2000));
   return { status: code === '0' ? (notes.length ? 'observado' : 'aceptado') : 'rechazado', code, message: one(nodes(result, CBC, 'Description')).textContent.slice(0, 2000), notes, cdr };
 }
+const betaCredentials = { ruc: '20123456789', username: 'MODDATOS', password: 'MODDATOS' };
+export async function consultBetaReceipt(job, fetchImpl = fetch) {
+  return consultReceiptTicket({ ticket: job.ticket, summaryId: job.summary_id, credentials: betaCredentials, environment: 'beta' }, fetchImpl);
+}
 export async function sendBetaFixture(fixture, fetchImpl = fetch) {
+  if (fixture.documentType === '03') return sendSignedReceiptSummary({ xml: fixture.xml, ruc: betaCredentials.ruc, summaryId: fixture.summaryId, credentials: betaCredentials, environment: 'beta' }, fetchImpl);
   if (fixture.fileName !== '20123456789-01-F001-1.zip') throw new Error('Solo se admite la factura ficticia.');
   const soap = attachSunatSecurityHeader(buildSunatSendBillSoap({ fileName: fixture.fileName, contentFileBase64: Buffer.from(fixture.zip).toString('base64') }), { ruc: '20123456789', username: 'MODDATOS', password: 'MODDATOS' });
   const response = await fetchImpl(getSunatEndpoint('beta'), { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: 'urn:sendBill' }, body: soap });

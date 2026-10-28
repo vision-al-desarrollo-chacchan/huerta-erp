@@ -38,3 +38,34 @@ test('fallo de almacenamiento antes de enviar no realiza solicitud SUNAT',async(
 test('CDR rechazado queda rechazado y observaciones quedan observadas',async()=>{
   for(const status of ['rechazado','observado']) {const s=setup({sendFixture:async()=>({status,code:status==='rechazado'?'2001':'0',message:'Prueba',notes:['Nota'],cdr:new Uint8Array([1])})});await s.handler(request());assert.equal(s.job.estado,status);}
 });
+
+test('boleta guarda ticket y consulta sin reenviar incluso tras resultado incierto', async () => {
+  let sends = 0, queries = 0;
+  const s = setup({
+    buildFixture: (type) => { assert.equal(type, '03'); return {xml: '<SummaryDocuments/>', summaryId: 'RC-20261028-1'}; },
+    sendFixture: async () => { sends++; return {status: 'enviando', ticket: '123456', message: 'Recibido'}; },
+    consultReceipt: async (job) => { queries++; assert.equal(job.ticket, '123456'); return {status: 'aceptado',code: '0',message: 'Aceptado',notes: [],cdr: new Uint8Array([1])}; },
+  });
+  s.job.document_type = '03';
+  const req = () => request({empresaId,idempotencyKey,documentType:'03'});
+  assert.equal((await s.handler(req())).status, 202);
+  assert.equal(s.job.summary_id, 'RC-20261028-1');
+  assert.equal(s.job.ticket, '123456');
+  s.job.estado = 'incierto';
+  assert.equal((await (await s.handler(req())).json()).estado, 'aceptado');
+  await s.handler(req());
+  assert.equal(sends, 1); assert.equal(queries, 1);
+});
+test('tipo inválido o clave de otro tipo no envían ni consultan', async () => {
+  const s=setup();
+  assert.equal((await s.handler(request({empresaId,idempotencyKey,documentType:'07'}))).status,400);
+  s.job.document_type='03';
+  assert.equal((await s.handler(request())).status,409);
+  assert.equal(s.sends(),0);
+});
+test('ticket pendiente o consulta fallida nunca reenvía la boleta', async () => {
+  const s=setup({consultReceipt:async()=>{throw new Error('timeout');}});
+  Object.assign(s.job,{document_type:'03',ticket:'123',summary_id:'RC-20261028-1',estado:'enviando'});
+  for(let i=0;i<2;i++) assert.equal((await s.handler(request({empresaId,idempotencyKey,documentType:'03'}))).status,202);
+  assert.equal(s.sends(),0);
+});
