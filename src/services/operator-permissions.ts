@@ -3,7 +3,7 @@ import type { ActiveOperator } from './operator-session';
 type Role = ActiveOperator['role'];
 
 const permissions: Record<Role, string[]> = {
-  cajero: ['/dashboard', '/ventas/pos', '/ventas/pedidos', '/ventas/facturacion', '/clientes', '/caja', '/calendario'],
+  cajero: ['/caja', '/ventas/facturacion'],
   mozo: ['/ventas/pos', '/ventas/pedidos', '/clientes', '/calendario'],
   moza_cajera: ['/dashboard', '/ventas/pos', '/ventas/pedidos', '/ventas/facturacion', '/clientes', '/caja', '/calendario'],
   cocina: ['/cocina', '/produccion', '/calendario'],
@@ -11,7 +11,7 @@ const permissions: Record<Role, string[]> = {
 };
 
 const home: Record<Role, string> = {
-  cajero: '/ventas/pos',
+  cajero: '/caja',
   mozo: '/ventas/pos',
   moza_cajera: '/ventas/pos',
   cocina: '/cocina',
@@ -32,6 +32,8 @@ export function operatorHome(role: Role) {
 
 export function operatorRolesHome(roles: Role[]) {
   if (roles.includes('supervisor')) return home.supervisor;
-  if (roles.includes('moza_cajera') || roles.includes('cajero') || roles.includes('mozo')) return home.cajero;
+  if (roles.includes('moza_cajera')) return home.moza_cajera;
+  if (roles.includes('cajero')) return home.cajero;
+  if (roles.includes('mozo')) return home.mozo;
   return home[roles[0] ?? 'mozo'];
 }
